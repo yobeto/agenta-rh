@@ -1,0 +1,165 @@
+"""
+Validador de principios éticos para el análisis de candidatos
+Asegura que todas las operaciones cumplan con los principios establecidos
+"""
+import re
+import logging
+from typing import List
+from dataclasses import dataclass
+
+from models.schemas import (
+    CandidateAnalysisRequest,
+    CandidateAnalysisResult,
+)
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ValidationResult:
+    """Resultado de una validación ética"""
+    is_valid: bool
+    reason: str = ""
+    warnings: List[str] = None
+    
+    def __post_init__(self):
+        if self.warnings is None:
+            self.warnings = []
+
+
+class EthicalValidator:
+    """
+    Valida que las solicitudes y análisis cumplan con principios éticos:
+    1. Propósito limitado
+    2. Variables válidas
+    3. Razonamiento verificable
+    4. Lenguaje neutral
+    5. Privacidad activa
+    """
+    
+    # Palabras prohibidas que indican juicios de valor
+    SUBJECTIVE_TERMS = [
+        "excelente", "malo", "bueno", "terrible", "perfecto",
+        "increíble", "horrible", "fantástico", "pésimo",
+        "genial", "mediocre", "sobresaliente", "decepcionante"
+    ]
+    
+    # Términos que indican inferencia de atributos personales
+    PERSONAL_ATTRIBUTES = [
+        "edad", "género", "raza", "religión", "orientación",
+        "estado civil", "nacionalidad", "discapacidad"
+    ]
+    
+    def validate_request(self, request: CandidateAnalysisRequest) -> ValidationResult:
+        """
+        Valida que la solicitud solo contenga información laboral válida
+        """
+        warnings: List[str] = []
+
+        # Validar longitud mínima del job description
+        if len(request.jobDescription.strip()) < 30:
+            warnings.append("El Job Description extraído parece muy corto o incompleto.")
+
+        # Validar que haya al menos un candidato
+        if not request.candidates:
+            return ValidationResult(
+                is_valid=False,
+                reason="No se proporcionaron CVs para analizar.",
+                warnings=warnings
+            )
+
+        for candidate in request.candidates:
+            candidate_text = f"{candidate.content}".lower()
+
+            for attr in self.PERSONAL_ATTRIBUTES:
+                if attr in candidate_text:
+                    return ValidationResult(
+                        is_valid=False,
+                        reason=f"El CV '{candidate.filename}' contiene información personal no permitida: {attr}",
+                        warnings=warnings
+                    )
+
+            if len(candidate.content.strip()) < 30:
+                warnings.append(
+                    f"El CV '{candidate.filename}' parece tener muy poco texto para evaluar."
+                )
+
+        return ValidationResult(
+            is_valid=True,
+            warnings=warnings
+        )
+    
+    def validate_analysis(self, analysis: CandidateAnalysisResult) -> ValidationResult:
+        """
+        Valida que el análisis cumpla con principios éticos
+        """
+        warnings = []
+        
+        # Verificar lenguaje neutral
+        recommendation_lower = analysis.recommendation.lower()
+        for term in self.SUBJECTIVE_TERMS:
+            if term in recommendation_lower:
+                return ValidationResult(
+                    is_valid=False,
+                    reason=f"El análisis contiene lenguaje subjetivo no permitido: '{term}'",
+                    warnings=warnings
+                )
+        
+        # Verificar que tenga criterios objetivos
+        if not analysis.objective_criteria or len(analysis.objective_criteria) == 0:
+            return ValidationResult(
+                is_valid=False,
+                reason="El análisis no incluye criterios objetivos verificables",
+                warnings=warnings
+            )
+        
+        # Verificar que no contenga datos personales
+        all_text = f"{analysis.recommendation} {analysis.confidence_explanation}"
+        all_text_lower = all_text.lower()
+        
+        for attr in self.PERSONAL_ATTRIBUTES:
+            if attr in all_text_lower:
+                return ValidationResult(
+                    is_valid=False,
+                    reason=f"El análisis contiene referencias a atributos personales: {attr}",
+                    warnings=warnings
+                )
+        
+        return ValidationResult(
+            is_valid=True,
+            warnings=warnings
+        )
+    
+    def adjust_analysis(self, analysis: CandidateAnalysisResult) -> CandidateAnalysisResult:
+        """
+        Ajusta un análisis para cumplir con principios éticos
+        """
+        # Remover términos subjetivos
+        recommendation = analysis.recommendation
+        for term in self.SUBJECTIVE_TERMS:
+            recommendation = re.sub(
+                rf'\b{term}\b',
+                '',
+                recommendation,
+                flags=re.IGNORECASE
+            )
+        
+        # Limpiar espacios múltiples
+        recommendation = re.sub(r'\s+', ' ', recommendation).strip()
+        
+        # Si quedó vacío, usar descripción neutral
+        if not recommendation:
+            recommendation = "Análisis basado en criterios objetivos disponibles"
+        
+        return CandidateAnalysisResult(
+            candidateId=analysis.candidateId,
+            filename=analysis.filename,
+            recommendation=recommendation,
+            objective_criteria=analysis.objective_criteria,
+            confidence_level=analysis.confidence_level,
+            confidence_explanation=analysis.confidence_explanation,
+            missing_information=analysis.missing_information,
+            ethical_compliance=True
+        )
+
+
