@@ -19,13 +19,13 @@ COPY --from=deps /app/node_modules ./node_modules
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 
-# Hacer el script de build ejecutable
-RUN chmod +x ./build.sh
-
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Usar el script de build que verifica las variables
-RUN ./build.sh
+# Hacer el script de build ejecutable y ejecutarlo
+RUN chmod +x ./build.sh && ./build.sh
+
+# Verificar que el build se completó correctamente
+RUN test -f .next/BUILD_ID || (echo "ERROR: BUILD_ID no se generó" && exit 1)
 
 # Production image
 FROM node:20-alpine AS runner
@@ -37,10 +37,17 @@ ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/next.config.js* ./
+
+# Copiar el build completo de Next.js (incluye BUILD_ID)
 COPY --from=builder /app/.next ./.next
+
+# Copiar node_modules (Next.js necesita todas las dependencias en runtime)
 COPY --from=builder /app/node_modules ./node_modules
 
 EXPOSE 3000
+
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
 
 # Render usa $PORT → esto es obligatorio
 CMD ["sh", "-c", "npm run start -- -p $PORT"]
