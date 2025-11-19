@@ -495,20 +495,27 @@ async def list_positions(
     Filtros opcionales: status, department, search
     """
     try:
+        logger.info(f"Listando posiciones - status: {status}, department: {department}, search: {search}")
+        logger.info(f"Cache de posiciones tiene {len(position_service.positions_cache)} elementos")
+        logger.info(f"Directorio de datos: {position_service.data_dir}")
+        logger.info(f"Directorio existe: {position_service.data_dir.exists()}")
+        
         positions = position_service.list_positions(
             status=status,
             department=department,
             search=search
         )
+        
+        logger.info(f"Retornando {len(positions)} posiciones")
         return {
             "positions": positions,
             "total": len(positions)
         }
     except Exception as e:
-        logger.error(f"Error listando posiciones: {str(e)}")
+        logger.error(f"Error listando posiciones: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail="Error interno al listar posiciones"
+            detail=f"Error interno al listar posiciones: {str(e)}"
         )
 
 

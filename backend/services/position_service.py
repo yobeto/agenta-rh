@@ -30,11 +30,17 @@ class PositionService:
         self.data_dir = POSITIONS_DATA_DIR
         self.pdfs_dir = POSITIONS_PDFS_DIR
         self.positions_cache: Dict[str, Dict] = {}
-        self._load_positions()
         
-        # Cargar automáticamente PDFs si están disponibles
-        if auto_load_pdfs:
-            self._auto_load_pdfs()
+        try:
+            self._load_positions()
+            
+            # Cargar automáticamente PDFs si están disponibles
+            if auto_load_pdfs:
+                self._auto_load_pdfs()
+        except Exception as e:
+            logger.error(f"Error inicializando PositionService: {e}", exc_info=True)
+            # Continuar con cache vacío en lugar de fallar completamente
+            self.positions_cache = {}
     
     def _load_positions(self):
         """Carga todas las posiciones desde archivos JSON"""
@@ -87,32 +93,36 @@ class PositionService:
             department: Filtrar por departamento
             search: Buscar en título o descripción
         """
-        positions = list(self.positions_cache.values())
-        
-        # Filtrar por status
-        if status:
-            positions = [p for p in positions if p.get('status') == status]
-        
-        # Filtrar por departamento
-        if department:
-            positions = [p for p in positions if p.get('department') == department]
-        
-        # Buscar en título o descripción
-        if search:
-            search_lower = search.lower()
-            positions = [
-                p for p in positions
-                if search_lower in p.get('title', '').lower() or
-                   search_lower in p.get('job_description', {}).get('raw_text', '').lower()
-            ]
-        
-        # Ordenar por último uso (más recientes primero)
-        positions.sort(
-            key=lambda x: x.get('statistics', {}).get('last_used', ''),
-            reverse=True
-        )
-        
-        return positions
+        try:
+            positions = list(self.positions_cache.values())
+            
+            # Filtrar por status
+            if status:
+                positions = [p for p in positions if p.get('status') == status]
+            
+            # Filtrar por departamento
+            if department:
+                positions = [p for p in positions if p.get('department') == department]
+            
+            # Buscar en título o descripción
+            if search:
+                search_lower = search.lower()
+                positions = [
+                    p for p in positions
+                    if search_lower in p.get('title', '').lower() or
+                       search_lower in p.get('job_description', {}).get('raw_text', '').lower()
+                ]
+            
+            # Ordenar por último uso (más recientes primero)
+            positions.sort(
+                key=lambda x: x.get('statistics', {}).get('last_used', '') or '',
+                reverse=True
+            )
+            
+            return positions
+        except Exception as e:
+            logger.error(f"Error en list_positions: {e}", exc_info=True)
+            return []
     
     def get_position(self, position_id: str) -> Optional[Dict]:
         """Obtiene una posición específica por ID"""
