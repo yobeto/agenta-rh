@@ -27,13 +27,35 @@ echo ""
 
 # Ejecutar el build de Next.js
 # Next.js automáticamente inyectará las variables NEXT_PUBLIC_*
+# Si el build falla, este comando fallará y detendrá el proceso
 npm run build
 
+# Verificar que el build se completó correctamente
+BUILD_EXIT_CODE=$?
+if [ $BUILD_EXIT_CODE -ne 0 ]; then
+  echo ""
+  echo "❌ ERROR: El build de Next.js falló con código de salida $BUILD_EXIT_CODE"
+  echo "   Revisa los logs anteriores para ver el error específico"
+  exit $BUILD_EXIT_CODE
+fi
+
+# Verificar que BUILD_ID se generó
+if [ ! -f .next/BUILD_ID ]; then
+  echo ""
+  echo "❌ ERROR: BUILD_ID no se generó después del build"
+  echo "   El directorio .next existe pero no contiene BUILD_ID"
+  echo "   Contenido de .next:"
+  ls -la .next/ || echo "   (no se pudo listar .next)"
+  exit 1
+fi
+
 echo ""
+echo "✅ Build completado exitosamente"
+echo "   BUILD_ID: $(cat .next/BUILD_ID)"
 if [ -z "$NEXT_PUBLIC_API_URL" ]; then
-  echo "⚠️  Build completado, pero NEXT_PUBLIC_API_URL no estaba configurada"
+  echo "⚠️  ADVERTENCIA: NEXT_PUBLIC_API_URL no estaba configurada"
   echo "   El frontend NO funcionará correctamente hasta configurar la variable"
 else
-  echo "✅ Build completado exitosamente con NEXT_PUBLIC_API_URL configurada"
+  echo "✅ NEXT_PUBLIC_API_URL configurada: $NEXT_PUBLIC_API_URL"
 fi
 
