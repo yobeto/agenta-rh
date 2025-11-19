@@ -399,7 +399,7 @@ export function ActionReasonModal({ isOpen, onClose, onConfirm, action, candidat
               }
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.opacity = isRequired && reason.trim().length < 20 ? 0.6 : 1
+              e.currentTarget.style.opacity = isRequired && reason.trim().length < 20 ? '0.6' : '1'
               e.currentTarget.style.transform = 'none'
             }}
           >
