@@ -57,3 +57,19 @@ export interface ChatMessageItem {
   message: string
   timestamp: string
 }
+
+export interface CreateUserRequest {
+  username: string
+  password: string
+  email: string
+  department: string
+  role?: string
+}
+
+export interface CreateUserResponse {
+  username: string
+  email: string
+  department: string
+  role: string
+  message: string
+}

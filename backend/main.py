@@ -2,23 +2,35 @@
 agente-rh - API Principal
 Asistente de preselección de candidatos con principios éticos estrictos
 """
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from typing import Optional, List
 import os
 import logging
 from dotenv import load_dotenv
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from services.candidate_analyzer import CandidateAnalyzer
 from services.ethical_validator import EthicalValidator
 from services.chat_service import ChatService
+from services.auth_service import authenticate_user, create_access_token, create_user
+from middleware.auth_middleware import get_current_user, get_current_admin_user
 from models.schemas import (
     CandidateAnalysisRequest,
     CandidateAnalysisResult,
     ChatRequest,
     ChatResponse,
+    LoginRequest,
+    LoginResponse,
+    CreateUserRequest,
+    CreateUserResponse,
 )
 from utils.pdf_parser import extract_text_from_pdf
+from datetime import timedelta
+from fastapi import Depends
 
 load_dotenv()
 
@@ -35,6 +47,19 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Rate Limiting
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Security Headers Middleware (solo en producción)
+if os.getenv("ENVIRONMENT") == "production":
+    allowed_hosts = os.getenv("ALLOWED_HOSTS", "*.inbursa.com").split(",")
+    app.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=allowed_hosts
+    )
+
 # CORS
 cors_origins = os.getenv(
     "CORS_ORIGINS",
@@ -45,8 +70,10 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=3600,
 )
 
 # Inicializar servicios
@@ -69,6 +96,76 @@ async def health_check():
     return {"status": "healthy", "service": "agente-rh"}
 
 
+# ============================================================================
+# AUTHENTICATION ENDPOINTS
+# ============================================================================
+
+@app.post("/api/auth/login", response_model=LoginResponse)
+@limiter.limit("5/minute")
+async def login(request: Request, login_request: LoginRequest):
+    """Endpoint de autenticación con rate limiting"""
+    user = authenticate_user(login_request.username, login_request.password)
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="Usuario o contraseña incorrectos",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    access_token_expires = timedelta(minutes=480)  # 8 horas
+    access_token = create_access_token(
+        data={"sub": user["username"]}, expires_delta=access_token_expires
+    )
+    
+    logger.info(f"Login exitoso: {user['username']} ({user.get('email', 'N/A')})")
+    return LoginResponse(
+        access_token=access_token,
+        token_type="bearer",
+        user=user
+    )
+
+
+@app.get("/api/auth/me")
+async def get_current_user_info(current_user: dict = Depends(get_current_user)):
+    """Obtiene la información del usuario autenticado"""
+    return current_user
+
+
+@app.post("/api/auth/logout")
+async def logout(current_user: dict = Depends(get_current_user)):
+    """Endpoint de logout (el token se invalida en el cliente)"""
+    return {"message": "Sesión cerrada exitosamente"}
+
+
+@app.post("/api/auth/create-user", response_model=CreateUserResponse)
+async def create_new_user(
+    user_request: CreateUserRequest,
+    current_admin: dict = Depends(get_current_admin_user)
+):
+    """Crea un nuevo usuario (solo para administradores)"""
+    success, message = create_user(
+        username=user_request.username,
+        password=user_request.password,
+        email=user_request.email,
+        department=user_request.department,
+        role=user_request.role or "user"
+    )
+    
+    if not success:
+        raise HTTPException(
+            status_code=400,
+            detail=message
+        )
+    
+    return CreateUserResponse(
+        username=user_request.username,
+        email=user_request.email,
+        department=user_request.department,
+        role=user_request.role or "user",
+        message=message
+    )
+
+
 @app.get("/api/models")
 async def get_models():
     """Modelos de IA disponibles"""
@@ -83,7 +180,10 @@ async def get_models():
 
 
 @app.post("/api/analyze", response_model=List[CandidateAnalysisResult])
-async def analyze_candidate(request: CandidateAnalysisRequest):
+async def analyze_candidate(
+    request: CandidateAnalysisRequest,
+    current_user: dict = Depends(get_current_user)
+):
     """
     Analiza uno o varios candidatos aplicando principios éticos estrictos.
     """
@@ -128,7 +228,10 @@ async def analyze_candidate(request: CandidateAnalysisRequest):
 
 
 @app.post("/api/extract-text")
-async def extract_text(file: UploadFile = File(...)):
+async def extract_text(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
     """Extrae texto plano de un PDF de descripción de puesto o CV"""
     if file.content_type not in {"application/pdf", "application/x-pdf"} and not file.filename.lower().endswith('.pdf'):
         raise HTTPException(status_code=400, detail="Solo se aceptan archivos PDF.")
@@ -151,7 +254,10 @@ async def extract_text(file: UploadFile = File(...)):
 
 
 @app.post("/api/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest):
+async def chat(
+    request: ChatRequest,
+    current_user: dict = Depends(get_current_user)
+):
     """Conversación contextual con el asistente ético"""
     try:
         history = [{"role": msg.role, "content": msg.content} for msg in (request.chatHistory or [])]

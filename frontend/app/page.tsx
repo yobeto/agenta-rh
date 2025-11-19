@@ -6,6 +6,9 @@ import { CandidateForm } from '@/components/CandidateForm'
 import { AnalysisResult } from '@/components/AnalysisResult'
 import { JobDescriptionInput } from '@/components/JobDescriptionInput'
 import { ChatPanel } from '@/components/ChatPanel'
+import { ProtectedRoute } from '@/components/ProtectedRoute'
+import { CreateUserForm } from '@/components/CreateUserForm'
+import { useAuth } from '@/contexts/AuthContext'
 import { analyzeCandidates } from '@/lib/api'
 import type {
   AnalyzeRequestPayload,
@@ -22,6 +25,8 @@ import {
   Sparkles,
   ArrowRight,
   CheckCircle2,
+  LogOut,
+  User,
 } from 'lucide-react'
 
 const MODEL_ID = 'gpt-4'
@@ -48,6 +53,7 @@ function computeScore(result: CandidateAnalysisResult): number {
 }
 
 export default function Home() {
+  const { user, logout } = useAuth()
   const [jobDescription, setJobDescription] = useState('')
   const [candidateDocuments, setCandidateDocuments] = useState<CandidateDocumentPayload[]>([])
   const [analysisResults, setAnalysisResults] = useState<CandidateAnalysisResult[]>([])
@@ -124,12 +130,42 @@ export default function Home() {
   const openChat = () => setIsChatOpen(true)
 
   return (
-    <main className="page-shell">
-      <header className="hero" aria-labelledby="intro">
+    <ProtectedRoute>
+      <main className="page-shell">
+        {/* Header con información del usuario */}
+        <div className="mb-6 flex justify-end items-center gap-3">
+          <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-lg border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-2 text-slate-700">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#003b71] to-[#0b5ca8] flex items-center justify-center text-white text-xs font-semibold">
+                {user?.username?.charAt(0).toUpperCase() || 'U'}
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-semibold text-slate-900">{user?.username}</span>
+                {user?.email && (
+                  <span className="text-xs text-slate-500">{user.email}</span>
+                )}
+              </div>
+            </div>
+            {user?.role && (
+              <span className="ml-2 text-xs font-semibold bg-gradient-to-r from-[#003b71] to-[#0b5ca8] text-white px-2.5 py-1 rounded-full">
+                {user.role.toUpperCase()}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={logout}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:border-slate-300 hover:text-slate-900 transition-all duration-200 shadow-sm hover:shadow-md"
+          >
+            <LogOut className="w-4 h-4" />
+            <span>Cerrar sesión</span>
+          </button>
+        </div>
+
+        <header className="hero" aria-labelledby="intro">
         <div className="hero__content">
           <div className="hero__logo hero__logo--large">
             <Image
-              src="/logo_inbursa_acceso.png"
+              src="/logo.png"
               alt="agente-rh"
               fill
               priority
@@ -301,12 +337,22 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Sección de administración (solo para admins) */}
+      {user?.role === 'admin' && (
+        <section className="workspace">
+          <div className="workspace__primary">
+            <CreateUserForm />
+          </div>
+        </section>
+      )}
+
       <ChatPanel
         isOpen={isChatOpen}
         onClose={() => setIsChatOpen(false)}
         selectedModel={MODEL_ID}
         onPreviewChange={setChatPreview}
       />
-    </main>
+      </main>
+    </ProtectedRoute>
   )
 }

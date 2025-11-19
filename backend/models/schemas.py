@@ -154,3 +154,46 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     message: str
     modelId: str
+
+
+# ============================================================================
+# AUTHENTICATION SCHEMAS
+# ============================================================================
+
+class LoginRequest(BaseModel):
+    """Solicitud de login"""
+    username: str = Field(..., description="Nombre de usuario")
+    password: str = Field(..., description="Contraseña", min_length=6)
+
+
+class LoginResponse(BaseModel):
+    """Respuesta de login exitoso"""
+    access_token: str = Field(..., description="Token JWT de acceso")
+    token_type: str = Field(default="bearer", description="Tipo de token")
+    user: dict = Field(..., description="Información del usuario")
+
+
+class UserInfo(BaseModel):
+    """Información del usuario autenticado"""
+    username: str
+    email: Optional[str] = None
+    role: Optional[str] = Field(default="user", description="Rol del usuario")
+    department: Optional[str] = Field(default=None, description="Departamento del usuario")
+
+
+class CreateUserRequest(BaseModel):
+    """Solicitud para crear un nuevo usuario (solo admins)"""
+    username: str = Field(..., description="Nombre de usuario", min_length=3, max_length=50)
+    password: str = Field(..., description="Contraseña", min_length=8)
+    email: str = Field(..., description="Email del usuario (debe ser @inbursa.com)")
+    department: str = Field(..., description="Departamento (debe ser 'RH' o 'Recursos Humanos')")
+    role: Optional[str] = Field(default="user", description="Rol del usuario")
+
+
+class CreateUserResponse(BaseModel):
+    """Respuesta de creación de usuario"""
+    username: str
+    email: str
+    department: str
+    role: str
+    message: str
