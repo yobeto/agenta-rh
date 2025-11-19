@@ -134,48 +134,40 @@ export function CreateUserForm() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label htmlFor="username" className="block text-sm font-semibold text-slate-700 mb-1.5">
-                Nombre de usuario *
+              <label htmlFor="username" className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-1.5">
+                <UserPlus className="h-4 w-4 text-slate-500" />
+                <span>Nombre de usuario *</span>
               </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <UserPlus className="h-4 w-4 text-slate-400" />
-                </div>
-                <input
-                  id="username"
-                  type="text"
-                  value={formData.username}
-                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                  required
-                  className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#003b71] focus:border-[#003b71] outline-none transition text-slate-900 placeholder-slate-400 text-sm"
-                  placeholder="usuario"
-                  disabled={isLoading}
-                  pattern="[a-zA-Z0-9_]{3,50}"
-                  title="3-50 caracteres, solo letras, números y guiones bajos"
-                />
-              </div>
+              <input
+                id="username"
+                type="text"
+                value={formData.username}
+                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                required
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#003b71] focus:border-[#003b71] outline-none transition text-slate-900 placeholder-slate-400 text-sm"
+                placeholder="usuario"
+                disabled={isLoading}
+                pattern="[a-zA-Z0-9_]{3,50}"
+                title="3-50 caracteres, solo letras, números y guiones bajos"
+              />
               <p className="text-xs text-slate-500 mt-1">3-50 caracteres, solo letras, números y guiones bajos</p>
             </div>
 
             <div>
-              <label htmlFor="email" className="block text-sm font-semibold text-slate-700 mb-1.5">
-                Correo electrónico *
+              <label htmlFor="email" className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-1.5">
+                <Mail className="h-4 w-4 text-slate-500" />
+                <span>Correo electrónico *</span>
               </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-4 w-4 text-slate-400" />
-                </div>
-                <input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  required
-                  className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#003b71] focus:border-[#003b71] outline-none transition text-slate-900 placeholder-slate-400 text-sm"
-                  placeholder="usuario@inbursa.com"
-                  disabled={isLoading}
-                />
-              </div>
+              <input
+                id="email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                required
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#003b71] focus:border-[#003b71] outline-none transition text-slate-900 placeholder-slate-400 text-sm"
+                placeholder="usuario@inbursa.com"
+                disabled={isLoading}
+              />
             </div>
           </div>
         </div>
@@ -188,20 +180,18 @@ export function CreateUserForm() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label htmlFor="password" className="block text-sm font-semibold text-slate-700 mb-1.5">
-                Contraseña *
+              <label htmlFor="password" className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-1.5">
+                <Lock className="h-4 w-4 text-slate-500" />
+                <span>Contraseña *</span>
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-4 w-4 text-slate-400" />
-                </div>
                 <input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   required
-                  className={`w-full pl-10 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-[#003b71] outline-none transition text-slate-900 placeholder-slate-400 text-sm ${
+                  className={`w-full px-4 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-[#003b71] outline-none transition text-slate-900 placeholder-slate-400 text-sm ${
                     formData.password.length > 0
                       ? isPasswordValid
                         ? 'border-green-300 focus:border-green-500'
@@ -249,20 +239,18 @@ export function CreateUserForm() {
             </div>
 
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-semibold text-slate-700 mb-1.5">
-                Confirmar contraseña *
+              <label htmlFor="confirmPassword" className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-1.5">
+                <Lock className="h-4 w-4 text-slate-500" />
+                <span>Confirmar contraseña *</span>
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-4 w-4 text-slate-400" />
-                </div>
                 <input
                   id="confirmPassword"
                   type={showConfirmPassword ? 'text' : 'password'}
                   value={formData.confirmPassword}
                   onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                   required
-                  className={`w-full pl-10 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-[#003b71] outline-none transition text-slate-900 placeholder-slate-400 text-sm ${
+                  className={`w-full px-4 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-[#003b71] outline-none transition text-slate-900 placeholder-slate-400 text-sm ${
                     formData.confirmPassword.length > 0
                       ? passwordsMatch
                         ? 'border-green-300 focus:border-green-500'
@@ -308,46 +296,38 @@ export function CreateUserForm() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label htmlFor="department" className="block text-sm font-semibold text-slate-700 mb-1.5">
-                Departamento *
+              <label htmlFor="department" className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-1.5">
+                <Building2 className="h-4 w-4 text-slate-500" />
+                <span>Departamento *</span>
               </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Building2 className="h-4 w-4 text-slate-400" />
-                </div>
-                <select
-                  id="department"
-                  value={formData.department}
-                  onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                  required
-                  className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#003b71] focus:border-[#003b71] outline-none transition bg-white text-slate-900 text-sm"
-                  disabled={isLoading}
-                >
-                  <option value="RH">RH</option>
-                </select>
-              </div>
+              <select
+                id="department"
+                value={formData.department}
+                onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                required
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#003b71] focus:border-[#003b71] outline-none transition bg-white text-slate-900 text-sm"
+                disabled={isLoading}
+              >
+                <option value="RH">RH</option>
+              </select>
             </div>
 
             <div>
-              <label htmlFor="role" className="block text-sm font-semibold text-slate-700 mb-1.5">
-                Rol *
+              <label htmlFor="role" className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-1.5">
+                <Shield className="h-4 w-4 text-slate-500" />
+                <span>Rol *</span>
               </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Shield className="h-4 w-4 text-slate-400" />
-                </div>
-                <select
-                  id="role"
-                  value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                  required
-                  className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#003b71] focus:border-[#003b71] outline-none transition bg-white text-slate-900 text-sm"
-                  disabled={isLoading}
-                >
-                  <option value="user">Usuario</option>
-                  <option value="admin">Administrador</option>
-                </select>
-              </div>
+              <select
+                id="role"
+                value={formData.role}
+                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                required
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#003b71] focus:border-[#003b71] outline-none transition bg-white text-slate-900 text-sm"
+                disabled={isLoading}
+              >
+                <option value="user">Usuario</option>
+                <option value="admin">Administrador</option>
+              </select>
             </div>
           </div>
         </div>
