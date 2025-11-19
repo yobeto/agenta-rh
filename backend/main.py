@@ -54,21 +54,28 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Security Headers Middleware (solo en producción)
 if os.getenv("ENVIRONMENT") == "production":
-    allowed_hosts = os.getenv("ALLOWED_HOSTS", "*.inbursa.com").split(",")
+    allowed_hosts = os.getenv("ALLOWED_HOSTS", "*.inbursa.com,*.onrender.com").split(",")
+    allowed_hosts = [host.strip() for host in allowed_hosts]
     app.add_middleware(
         TrustedHostMiddleware,
         allowed_hosts=allowed_hosts
     )
+    logger.info(f"TrustedHostMiddleware configurado con hosts: {allowed_hosts}")
 
-# CORS
-cors_origins = os.getenv(
+# CORS - Mejorado para manejar espacios y logging
+cors_origins_env = os.getenv(
     "CORS_ORIGINS",
     "http://localhost:3000,http://127.0.0.1:3000"
-).split(",")
+)
+# Limpiar espacios y dividir por comas
+cors_origins = [origin.strip() for origin in cors_origins_env.split(",") if origin.strip()]
+
+# Logging para debuggear
+logger.info(f"CORS configurado con orígenes permitidos: {cors_origins}")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_origins,
+    allow_origins=cors_origins if "*" not in cors_origins else ["*"],  # Si hay "*", permitir todos
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
@@ -94,6 +101,20 @@ async def root():
 @app.get("/api/health")
 async def health_check():
     return {"status": "healthy", "service": "agente-rh"}
+
+
+@app.get("/api/debug/config")
+async def debug_config():
+    """Endpoint de debug para verificar configuración (solo en desarrollo)"""
+    if os.getenv("ENVIRONMENT") == "production":
+        return {"error": "Este endpoint solo está disponible en desarrollo"}
+    
+    return {
+        "cors_origins": cors_origins,
+        "environment": os.getenv("ENVIRONMENT", "development"),
+        "cors_origins_env": os.getenv("CORS_ORIGINS", "not set"),
+        "allowed_hosts": os.getenv("ALLOWED_HOSTS", "not set"),
+    }
 
 
 # ============================================================================
