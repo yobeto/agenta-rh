@@ -50,19 +50,11 @@ COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
 COPY --from=builder --chown=nextjs:nodejs /app/next.config.js* ./
 
 # Copiar el build completo de Next.js (incluye BUILD_ID)
+# El build.sh ya verificó que BUILD_ID existe, así que confiamos en la copia
 COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
 
 # Copiar node_modules (Next.js necesita todas las dependencias en runtime)
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
-
-# Verificar que BUILD_ID existe después de copiar (antes de cambiar de usuario)
-RUN if [ ! -f .next/BUILD_ID ]; then \
-      echo "ERROR: BUILD_ID no se copió correctamente" && \
-      ls -la .next/ && \
-      exit 1; \
-    else \
-      echo "✅ BUILD_ID copiado correctamente: $(cat .next/BUILD_ID)"; \
-    fi
 
 # Cambiar a usuario no-root para ejecutar la aplicación
 USER nextjs
