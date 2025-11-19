@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { Loader2 } from 'lucide-react'
@@ -8,41 +8,55 @@ import { Loader2 } from 'lucide-react'
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth()
   const router = useRouter()
+  const [shouldRedirect, setShouldRedirect] = useState(false)
+  const [forceShow, setForceShow] = useState(false)
+
+  // Timeout de seguridad: después de 3 segundos, forzar mostrar contenido o redirigir
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      console.warn('ProtectedRoute: Timeout de seguridad activado')
+      if (!isAuthenticated) {
+        setShouldRedirect(true)
+      } else {
+        setForceShow(true)
+      }
+    }, 3000)
+
+    return () => clearTimeout(timeoutId)
+  }, [isAuthenticated])
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    if (shouldRedirect || (!isLoading && !isAuthenticated && !forceShow)) {
+      console.log('ProtectedRoute: Redirigiendo a login')
       router.push('/login')
     }
-  }, [isAuthenticated, isLoading, router])
+  }, [isAuthenticated, isLoading, router, shouldRedirect, forceShow])
 
-  // Timeout de seguridad: si isLoading tarda más de 5 segundos, redirigir a login
-  useEffect(() => {
-    if (isLoading) {
-      const timeoutId = setTimeout(() => {
-        console.warn('ProtectedRoute: Timeout de carga, redirigiendo a login')
-        router.push('/login')
-      }, 5000) // 5 segundos máximo
-
-      return () => clearTimeout(timeoutId)
-    }
-  }, [isLoading, router])
-
-  if (isLoading) {
+  // Si está cargando y no ha pasado el timeout, mostrar loader
+  if (isLoading && !forceShow) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
           <p className="text-slate-600">Cargando...</p>
-          <p className="text-sm text-slate-400 mt-2">Si esto tarda más de 5 segundos, serás redirigido al login</p>
+          <p className="text-sm text-slate-400 mt-2">Verificando autenticación...</p>
         </div>
       </div>
     )
   }
 
-  if (!isAuthenticated) {
-    return null // Se redirigirá a /login
+  // Si no está autenticado y no hay que forzar, no mostrar nada (se redirigirá)
+  if (!isAuthenticated && !forceShow) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <p className="text-slate-600">Redirigiendo al login...</p>
+        </div>
+      </div>
+    )
   }
 
+  // Mostrar contenido si está autenticado o si forzamos la visualización
   return <>{children}</>
 }
 
