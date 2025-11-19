@@ -87,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('Login error:', error)
       // Mejorar mensajes de error
       if (error.message?.includes('fetch')) {
-        throw new Error('No se pudo conectar con el servidor. Verifica que el backend esté corriendo en http://localhost:8000')
+        throw new Error('No se pudo conectar con el servidor. Por favor, intenta nuevamente.')
       }
       throw error
     }
