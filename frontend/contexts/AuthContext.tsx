@@ -56,6 +56,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (username: string, password: string) => {
     try {
+      console.log('🔐 Iniciando login para:', username)
+      console.log('🔐 URL del API:', `${API_URL}/api/auth/login`)
+      
       const response = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: {
@@ -64,33 +67,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ username, password }),
       })
 
+      console.log('🔐 Respuesta recibida:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        headers: Object.fromEntries(response.headers.entries())
+      })
+
       if (!response.ok) {
         let errorMessage = 'Error al iniciar sesión'
         try {
           const error = await response.json()
           errorMessage = error.detail || errorMessage
+          console.error('🔐 Error del servidor:', error)
         } catch {
           errorMessage = `Error ${response.status}: ${response.statusText}`
+          console.error('🔐 Error al parsear respuesta:', errorMessage)
         }
         throw new Error(errorMessage)
       }
 
+      console.log('🔐 Parseando respuesta JSON...')
       const data = await response.json()
+      console.log('🔐 Datos recibidos:', { 
+        hasToken: !!data.access_token, 
+        hasUser: !!data.user,
+        user: data.user 
+      })
       
       // Guardar token y usuario en localStorage
+      console.log('🔐 Guardando en localStorage...')
       localStorage.setItem(TOKEN_KEY, data.access_token)
       localStorage.setItem(USER_KEY, JSON.stringify(data.user))
       
       // También establecer cookie para el middleware de Next.js
       document.cookie = `agente-rh-token=${data.access_token}; path=/; max-age=${8 * 60 * 60}; SameSite=Lax`
+      console.log('🔐 Cookie establecida')
       
+      console.log('🔐 Actualizando estado...')
       setToken(data.access_token)
       setUser(data.user)
       
-      // Redirigir a la página principal
-      router.push('/')
+      console.log('🔐 Estado actualizado, esperando un momento antes de redirigir...')
+      // Pequeño delay para asegurar que el estado se actualice
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      console.log('🔐 Redirigiendo a /...')
+      // Usar window.location para una redirección más confiable
+      window.location.href = '/'
+      console.log('🔐 Login completado exitosamente')
     } catch (error: any) {
-      console.error('Login error:', error)
+      console.error('🔐 Login error completo:', error)
+      console.error('🔐 Stack trace:', error.stack)
       // Mejorar mensajes de error
       if (error.message?.includes('fetch')) {
         throw new Error('No se pudo conectar con el servidor. Por favor, intenta nuevamente.')

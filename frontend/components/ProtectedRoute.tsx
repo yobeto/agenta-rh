@@ -6,16 +6,25 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Loader2 } from 'lucide-react'
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth()
+  const { isAuthenticated, isLoading, user, token } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
+    console.log('🛡️ ProtectedRoute - Estado:', {
+      isAuthenticated,
+      isLoading,
+      hasUser: !!user,
+      hasToken: !!token
+    })
+    
     if (!isLoading && !isAuthenticated) {
+      console.log('🛡️ ProtectedRoute - Redirigiendo a /login (no autenticado)')
       router.push('/login')
     }
-  }, [isAuthenticated, isLoading, router])
+  }, [isAuthenticated, isLoading, router, user, token])
 
   if (isLoading) {
+    console.log('🛡️ ProtectedRoute - Mostrando loader (cargando)')
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -27,9 +36,11 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (!isAuthenticated) {
+    console.log('🛡️ ProtectedRoute - No autenticado, retornando null')
     return null
   }
 
+  console.log('🛡️ ProtectedRoute - Usuario autenticado, mostrando contenido')
   return <>{children}</>
 }
 
