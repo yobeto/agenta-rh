@@ -24,6 +24,12 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 const TOKEN_KEY = 'agente-rh-token'
 const USER_KEY = 'agente-rh-user'
 
+// Logging para debuggear
+if (typeof window !== 'undefined') {
+  console.log('🔧 AuthContext - API_URL:', API_URL)
+  console.log('🔧 AuthContext - NEXT_PUBLIC_API_URL:', process.env.NEXT_PUBLIC_API_URL)
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [token, setToken] = useState<string | null>(null)
