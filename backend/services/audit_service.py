@@ -26,7 +26,7 @@ class CandidateAction:
     action: str  # 'interview', 'rejected', 'on_hold'
     username: str
     timestamp: str
-    notes: Optional[str] = None
+    reason: Optional[str] = None
 
 
 def load_audit_log():
@@ -56,7 +56,7 @@ def log_candidate_action(
     candidate_filename: str,
     action: str,
     username: str,
-    notes: Optional[str] = None
+    reason: Optional[str] = None
 ) -> CandidateAction:
     """
     Registra una acción sobre un candidato
@@ -69,7 +69,7 @@ def log_candidate_action(
         action=action,
         username=username,
         timestamp=timestamp,
-        notes=notes
+        reason=reason
     )
     
     AUDIT_LOG.append(asdict(action_record))

@@ -388,6 +388,7 @@ async def register_candidate_action(
 ):
     """
     Registra una acción sobre un candidato (pasar a entrevista, rechazar, en espera)
+    La razón es obligatoria para rechazos y debe tener al menos 20 caracteres.
     """
     try:
         # Validar que la acción sea válida
@@ -398,12 +399,20 @@ async def register_candidate_action(
                 detail=f"Acción inválida. Debe ser una de: {', '.join(valid_actions)}"
             )
         
+        # Validar razón para rechazos
+        if action_request.action == 'rejected':
+            if not action_request.reason or len(action_request.reason.strip()) < 20:
+                raise HTTPException(
+                    status_code=400,
+                    detail="La razón es obligatoria para rechazos y debe tener al menos 20 caracteres"
+                )
+        
         action_record = log_candidate_action(
             candidate_id=action_request.candidate_id,
             candidate_filename=action_request.candidate_filename,
             action=action_request.action,
             username=current_user['username'],
-            notes=action_request.notes
+            reason=action_request.reason
         )
         
         return CandidateActionResponse(
@@ -412,7 +421,7 @@ async def register_candidate_action(
             action=action_record.action,
             username=action_record.username,
             timestamp=action_record.timestamp,
-            notes=action_record.notes,
+            reason=action_record.reason,
             message="Acción registrada exitosamente"
         )
     except HTTPException:

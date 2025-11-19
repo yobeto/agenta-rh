@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { UserPlus, FileText, X, Shield, Briefcase } from 'lucide-react'
 import { CreateUserForm } from './CreateUserForm'
@@ -12,6 +12,16 @@ type AdminView = 'none' | 'create-user' | 'create-position' | 'audit-log'
 export function AdminMenu() {
   const { user } = useAuth()
   const [activeView, setActiveView] = useState<AdminView>('none')
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   if (user?.role !== 'admin') {
     return null
@@ -44,18 +54,24 @@ export function AdminMenu() {
       {/* Barra de menú de administración */}
       <div style={{
         background: 'linear-gradient(135deg, var(--brand-primary, #003b71), var(--brand-accent, #0b5ca8))',
-        padding: '0.75rem 2rem',
+        padding: isMobile ? '0.75rem 1rem' : '0.75rem 2rem',
         display: 'flex',
-        alignItems: 'center',
-        gap: '1.5rem',
+        flexDirection: isMobile ? 'column' : 'row',
+        alignItems: isMobile ? 'stretch' : 'center',
+        gap: isMobile ? '0.75rem' : '1.5rem',
         boxShadow: '0 2px 8px rgba(0, 59, 113, 0.15)',
         marginBottom: '2rem'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'white' }}>
-          <Shield size={18} />
-          <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Administración</span>
+      }} className="admin-menu-bar">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'white', flexShrink: 0 }}>
+          <Shield size={isMobile ? 16 : 18} />
+          <span style={{ fontWeight: 600, fontSize: isMobile ? '0.85rem' : '0.9rem' }}>Administración</span>
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
+        <div style={{ 
+          display: 'flex', 
+          gap: '0.5rem',
+          flexWrap: 'wrap',
+          width: isMobile ? '100%' : 'auto'
+        }}>
           {menuItems.map((item) => {
             const Icon = item.icon
             return (
@@ -64,7 +80,7 @@ export function AdminMenu() {
                 type="button"
                 onClick={() => setActiveView(item.id)}
                 style={{
-                  padding: '0.625rem 1.25rem',
+                  padding: isMobile ? '0.5rem 0.875rem' : '0.625rem 1rem',
                   background: activeView === item.id ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)',
                   border: 'none',
                   borderRadius: '0.5rem',
@@ -72,10 +88,13 @@ export function AdminMenu() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem',
-                  fontSize: '0.875rem',
+                  fontSize: isMobile ? '0.8rem' : '0.875rem',
                   color: 'white',
                   fontWeight: activeView === item.id ? 600 : 500,
-                  transition: 'all 0.2s'
+                  transition: 'all 0.2s',
+                  flex: isMobile ? '1 1 calc(50% - 0.25rem)' : '0 1 auto',
+                  minWidth: isMobile ? '0' : 'auto',
+                  justifyContent: isMobile ? 'center' : 'flex-start'
                 }}
                 onMouseEnter={(e) => {
                   if (activeView !== item.id) {
@@ -88,7 +107,7 @@ export function AdminMenu() {
                   }
                 }}
               >
-                <Icon size={16} />
+                <Icon size={isMobile ? 14 : 16} style={{ flexShrink: 0 }} />
                 <span>{item.label}</span>
               </button>
             )

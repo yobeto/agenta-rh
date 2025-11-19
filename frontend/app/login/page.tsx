@@ -12,10 +12,17 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
   const { login } = useAuth()
 
   useEffect(() => {
     setMounted(true)
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 640)
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -83,7 +90,7 @@ export default function LoginPage() {
             backdropFilter: 'blur(10px)',
             borderRadius: '1.25rem',
             boxShadow: '0 20px 60px -12px rgba(0, 47, 108, 0.25), 0 0 0 1px rgba(0, 47, 108, 0.05)',
-            padding: '2.5rem',
+            padding: isMobile ? '1.5rem' : '2.5rem',
             border: '1px solid rgba(0, 47, 108, 0.1)',
             margin: '0 auto',
             width: '100%'
@@ -92,10 +99,10 @@ export default function LoginPage() {
           {/* Logo */}
           <div className="text-center mb-8">
             <div className="relative mx-auto mb-6" style={{
-              width: '200px',
-              height: '200px',
+              width: isMobile ? '150px' : '200px',
+              height: isMobile ? '150px' : '200px',
               filter: 'drop-shadow(0 4px 16px rgba(0, 59, 113, 0.2))',
-              marginBottom: '1.5rem'
+              marginBottom: isMobile ? '1rem' : '1.5rem'
             }}>
               <Image
                 src="/logo.png"
@@ -103,7 +110,7 @@ export default function LoginPage() {
                 fill
                 priority
                 style={{ objectFit: 'contain' }}
-                sizes="200px"
+                sizes={isMobile ? '150px' : '200px'}
               />
             </div>
             <div style={{

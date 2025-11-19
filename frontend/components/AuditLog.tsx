@@ -266,10 +266,21 @@ export function AuditLog() {
                     {formatDate(entry.timestamp)}
                   </span>
                 </div>
-                {entry.notes && (
-                  <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.5rem', fontStyle: 'italic' }}>
-                    {entry.notes}
-                  </p>
+                {entry.reason && (
+                  <div style={{ 
+                    marginTop: '0.75rem', 
+                    padding: '0.75rem', 
+                    background: 'rgba(0, 59, 113, 0.03)',
+                    borderRadius: '0.5rem',
+                    border: '1px solid rgba(0, 59, 113, 0.1)'
+                  }}>
+                    <strong style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.25rem' }}>
+                      Razón:
+                    </strong>
+                    <p style={{ fontSize: '0.875rem', color: 'var(--text-primary)', margin: 0 }}>
+                      {entry.reason}
+                    </p>
+                  </div>
                 )}
               </div>
             </div>

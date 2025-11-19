@@ -5,6 +5,7 @@ import type { CandidateAnalysisResult } from '@/types'
 import { AlertTriangle, CheckCircle2, ShieldCheck, Sparkles, Users, X, CheckCircle, Clock, XCircle } from 'lucide-react'
 import { registerCandidateAction } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
+import { ActionReasonModal } from './ActionReasonModal'
 
 interface Props {
   results: CandidateAnalysisResult[]
@@ -65,6 +66,17 @@ export function AnalysisResult({ results }: Props) {
   const [selectedCandidates, setSelectedCandidates] = useState<Set<string>>(new Set())
   const [candidateActions, setCandidateActions] = useState<Record<string, CandidateAction>>({})
   const [showBulkActions, setShowBulkActions] = useState(false)
+  const [actionModal, setActionModal] = useState<{
+    isOpen: boolean
+    candidateId: string | null
+    action: CandidateStatus | null
+    result: CandidateAnalysisResult | null
+  }>({
+    isOpen: false,
+    candidateId: null,
+    action: null,
+    result: null
+  })
 
   // Cargar acciones guardadas del localStorage
   useEffect(() => {
@@ -119,19 +131,35 @@ export function AnalysisResult({ results }: Props) {
     setShowBulkActions(false)
   }
 
-  const applyAction = async (candidateId: string, status: CandidateStatus, result: CandidateAnalysisResult) => {
+  const handleActionClick = (candidateId: string, status: CandidateStatus, result: CandidateAnalysisResult) => {
+    setActionModal({
+      isOpen: true,
+      candidateId,
+      action: status,
+      result
+    })
+  }
+
+  const handleActionConfirm = async (reason: string) => {
+    if (!actionModal.candidateId || !actionModal.action || !actionModal.result) return
+
+    const candidateId = actionModal.candidateId
+    const status = actionModal.action
+    const result = actionModal.result
+
     try {
       // Enviar al backend
       await registerCandidateAction({
         candidate_id: candidateId,
         candidate_filename: result.filename,
         action: status,
+        reason: reason || undefined
       })
       
       // Actualizar estado local
       setCandidateActions(prev => ({
         ...prev,
-        [candidateId]: { candidateId, status }
+        [candidateId]: { candidateId, status, notes: reason }
       }))
       setSelectedCandidates(prev => {
         const next = new Set(prev)
@@ -143,12 +171,44 @@ export function AnalysisResult({ results }: Props) {
       // Aún así actualizar el estado local para feedback inmediato
       setCandidateActions(prev => ({
         ...prev,
-        [candidateId]: { candidateId, status }
+        [candidateId]: { candidateId, status, notes: reason }
+      }))
+    } finally {
+      setActionModal({ isOpen: false, candidateId: null, action: null, result: null })
+    }
+  }
+
+  const applyAction = async (candidateId: string, status: CandidateStatus, result: CandidateAnalysisResult, reason: string = '') => {
+    try {
+      // Enviar al backend
+      await registerCandidateAction({
+        candidate_id: candidateId,
+        candidate_filename: result.filename,
+        action: status,
+        reason: reason || undefined
+      })
+      
+      // Actualizar estado local
+      setCandidateActions(prev => ({
+        ...prev,
+        [candidateId]: { candidateId, status, notes: reason }
+      }))
+      setSelectedCandidates(prev => {
+        const next = new Set(prev)
+        next.delete(candidateId)
+        return next
+      })
+    } catch (error) {
+      console.error('Error registrando acción:', error)
+      // Aún así actualizar el estado local para feedback inmediato
+      setCandidateActions(prev => ({
+        ...prev,
+        [candidateId]: { candidateId, status, notes: reason }
       }))
     }
   }
 
-  const applyBulkAction = async (status: CandidateStatus) => {
+  const applyBulkAction = async (status: CandidateStatus, reason: string = '') => {
     const updates: Record<string, CandidateAction> = {}
     const promises: Promise<void>[] = []
     
@@ -161,12 +221,13 @@ export function AnalysisResult({ results }: Props) {
             candidate_id: id,
             candidate_filename: result.filename,
             action: status,
+            reason: reason || undefined
           }).then(() => {
-            updates[id] = { candidateId: id, status }
+            updates[id] = { candidateId: id, status, notes: reason }
           }).catch(error => {
             console.error(`Error registrando acción para ${id}:`, error)
             // Aún así actualizar localmente
-            updates[id] = { candidateId: id, status }
+            updates[id] = { candidateId: id, status, notes: reason }
           })
         )
       }
@@ -176,6 +237,30 @@ export function AnalysisResult({ results }: Props) {
     setCandidateActions(prev => ({ ...prev, ...updates }))
     setSelectedCandidates(new Set())
     setShowBulkActions(false)
+  }
+
+  const handleBulkActionClick = (status: CandidateStatus) => {
+    // Para acciones en lote, también pedir razón si es rechazo
+    if (status === 'rejected') {
+      // Abrir modal para razón
+      setActionModal({
+        isOpen: true,
+        candidateId: 'bulk',
+        action: status,
+        result: null
+      })
+    } else {
+      // Para otras acciones, aplicar directamente sin razón
+      applyBulkAction(status, '')
+    }
+  }
+
+  const handleBulkActionConfirm = async (reason: string) => {
+    if (!actionModal.action) return
+    
+    const status = actionModal.action
+    await applyBulkAction(status, reason)
+    setActionModal({ isOpen: false, candidateId: null, action: null, result: null })
   }
 
   const getStatusLabel = (status: CandidateStatus): string => {
@@ -252,7 +337,7 @@ export function AnalysisResult({ results }: Props) {
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
             <button
               type="button"
-              onClick={() => applyBulkAction('interview')}
+              onClick={() => handleBulkActionClick('interview')}
               className="btn-primary"
               style={{ fontSize: '0.875rem', padding: '0.625rem 1.25rem' }}
             >
@@ -261,7 +346,7 @@ export function AnalysisResult({ results }: Props) {
             </button>
             <button
               type="button"
-              onClick={() => applyBulkAction('on_hold')}
+              onClick={() => handleBulkActionClick('on_hold')}
               className="btn-outline"
               style={{ fontSize: '0.875rem', padding: '0.625rem 1.25rem' }}
             >
@@ -270,7 +355,7 @@ export function AnalysisResult({ results }: Props) {
             </button>
             <button
               type="button"
-              onClick={() => applyBulkAction('rejected')}
+              onClick={() => handleBulkActionClick('rejected')}
               style={{ 
                 fontSize: '0.875rem', 
                 padding: '0.625rem 1.25rem',
@@ -420,7 +505,7 @@ export function AnalysisResult({ results }: Props) {
               }}>
                 <button
                   type="button"
-                  onClick={() => applyAction(candidateId, 'interview', result)}
+                  onClick={() => handleActionClick(candidateId, 'interview', result)}
                   style={{
                     fontSize: '0.875rem',
                     padding: '0.5rem 1rem',
@@ -453,7 +538,7 @@ export function AnalysisResult({ results }: Props) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => applyAction(candidateId, 'on_hold', result)}
+                  onClick={() => handleActionClick(candidateId, 'on_hold', result)}
                   style={{
                     fontSize: '0.875rem',
                     padding: '0.5rem 1rem',
@@ -476,7 +561,7 @@ export function AnalysisResult({ results }: Props) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => applyAction(candidateId, 'rejected', result)}
+                  onClick={() => handleActionClick(candidateId, 'rejected', result)}
                   style={{
                     fontSize: '0.875rem',
                     padding: '0.5rem 1rem',
@@ -591,6 +676,24 @@ export function AnalysisResult({ results }: Props) {
           )
         })}
       </div>
+
+      {/* Modal para capturar razón */}
+      {actionModal.isOpen && actionModal.action && (
+        <ActionReasonModal
+          isOpen={actionModal.isOpen}
+          onClose={() => setActionModal({ isOpen: false, candidateId: null, action: null, result: null })}
+          onConfirm={actionModal.candidateId === 'bulk' ? handleBulkActionConfirm : handleActionConfirm}
+          action={actionModal.action}
+          candidateName={
+            actionModal.candidateId === 'bulk'
+              ? `${selectedCandidates.size} candidatos seleccionados`
+              : actionModal.result
+              ? actionModal.result.candidateId || actionModal.result.filename
+              : 'Candidato'
+          }
+          isRequired={actionModal.action === 'rejected'}
+        />
+      )}
     </section>
   )
 }
