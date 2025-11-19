@@ -24,6 +24,12 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 const TOKEN_KEY = 'agente-rh-token'
 const USER_KEY = 'agente-rh-user'
 
+// Log para debugging (solo en desarrollo o si está usando localhost)
+if (typeof window !== 'undefined' && API_URL.includes('localhost')) {
+  console.warn('⚠️ Frontend está usando localhost. Verifica que NEXT_PUBLIC_API_URL esté configurada en Render.')
+  console.log('🔍 API_URL actual:', API_URL)
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [token, setToken] = useState<string | null>(null)
