@@ -25,12 +25,17 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return () => clearTimeout(timeoutId)
   }, [isAuthenticated])
 
+  // Redirigir si no está autenticado
   useEffect(() => {
     if (shouldRedirect || (!isLoading && !isAuthenticated && !forceShow)) {
       console.log('ProtectedRoute: Redirigiendo a login')
-      router.push('/login')
+      // Usar window.location para forzar la redirección
+      const timer = setTimeout(() => {
+        window.location.href = '/login'
+      }, 100)
+      return () => clearTimeout(timer)
     }
-  }, [isAuthenticated, isLoading, router, shouldRedirect, forceShow])
+  }, [isAuthenticated, isLoading, shouldRedirect, forceShow])
 
   // Si está cargando y no ha pasado el timeout, mostrar loader
   if (isLoading && !forceShow) {
@@ -45,12 +50,18 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     )
   }
 
-  // Si no está autenticado y no hay que forzar, no mostrar nada (se redirigirá)
+  // Si no está autenticado y no hay que forzar, mostrar mensaje
   if (!isAuthenticated && !forceShow) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="text-center">
-          <p className="text-slate-600">Redirigiendo al login...</p>
+          <p className="text-slate-600 text-lg">Redirigiendo al login...</p>
+          <p className="text-slate-400 text-sm mt-2">
+            Si no eres redirigido automáticamente,{' '}
+            <a href="/login" className="text-blue-600 underline">
+              haz clic aquí
+            </a>
+          </p>
         </div>
       </div>
     )

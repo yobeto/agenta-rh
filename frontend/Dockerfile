@@ -27,11 +27,16 @@ ENV NODE_ENV=production
 RUN chmod +x ./build.sh && ./build.sh
 
 # Verificar que el build se completó correctamente
-RUN if [ ! -f .next/BUILD_ID ]; then \
-      echo "ERROR: BUILD_ID no se generó. El build falló." && \
+RUN echo "🔍 Verificando BUILD_ID..." && \
+    if [ ! -f .next/BUILD_ID ]; then \
+      echo "❌ ERROR: BUILD_ID no se generó. El build falló." && \
+      echo "Contenido de .next:" && \
+      ls -la .next/ 2>&1 || true && \
       exit 1; \
     else \
-      echo "✅ BUILD_ID generado correctamente: $(cat .next/BUILD_ID)"; \
+      BUILD_ID_VALUE=$(cat .next/BUILD_ID) && \
+      echo "✅ BUILD_ID generado correctamente: ${BUILD_ID_VALUE}" && \
+      echo "✅ Verificación completada exitosamente"; \
     fi
 
 # Production image

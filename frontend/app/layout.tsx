@@ -18,8 +18,31 @@ export default function RootLayout({
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <style dangerouslySetInnerHTML={{
+          __html: `
+            body { margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+            #root-fallback { 
+              position: fixed; 
+              top: 0; 
+              left: 0; 
+              right: 0; 
+              bottom: 0; 
+              background: #f8fafc; 
+              display: flex; 
+              align-items: center; 
+              justify-content: center; 
+              z-index: 9999;
+            }
+          `
+        }} />
       </head>
       <body className="bg-slate-50 text-slate-800 min-h-screen">
+        <noscript>
+          <div style={{ padding: '2rem', textAlign: 'center' }}>
+            <h1>JavaScript requerido</h1>
+            <p>Esta aplicación requiere JavaScript para funcionar.</p>
+          </div>
+        </noscript>
         <ErrorBoundary>
           <AuthProvider>
             {children}
