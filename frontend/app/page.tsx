@@ -24,7 +24,6 @@ import {
   BarChart3,
   Sparkles,
   ArrowRight,
-  CheckCircle2,
   LogOut,
   User,
 } from 'lucide-react'
@@ -80,12 +79,13 @@ export default function Home() {
   const analysisSnapshot = useMemo(() => {
     if (!analysisResults.length) return null
     const scored = analysisResults.map(result => ({ result, score: computeScore(result) }))
-    const best = scored.reduce((acc, item) => (item.score > acc.score ? item : acc), scored[0])
+    const maxScore = Math.max(...scored.map(item => item.score))
+    const bestMatches = scored.filter(item => item.score === maxScore)
     const average = Math.round(
       scored.reduce((sum, item) => sum + item.score, 0) / Math.max(1, scored.length)
     )
     const flagged = analysisResults.filter(result => result.ethical_compliance === false).length
-    return { average, best, flagged }
+    return { average, bestMatches, maxScore, flagged }
   }, [analysisResults])
 
   const lastAssistantPreview = useMemo(() => {
@@ -291,10 +291,27 @@ export default function Home() {
               <div className="analysis-summary__item">
                 <span className="analysis-summary__label">Mejor match</span>
                 <div>
-                  <strong>
-                    {analysisSnapshot.best.result.candidateId || analysisSnapshot.best.result.filename}
-                  </strong>
-                  <span>{analysisSnapshot.best.score}/100</span>
+                  {analysisSnapshot.bestMatches.length === 1 ? (
+                    <>
+                      <strong>
+                        {analysisSnapshot.bestMatches[0].result.candidateId || analysisSnapshot.bestMatches[0].result.filename}
+                      </strong>
+                      <span>{analysisSnapshot.maxScore}/100</span>
+                    </>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+                      <span style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.25rem' }}>
+                        {analysisSnapshot.bestMatches.length} empates ({analysisSnapshot.maxScore}/100)
+                      </span>
+                      {analysisSnapshot.bestMatches.map((match, index) => (
+                        <div key={index} style={{ display: 'flex', alignItems: 'center' }}>
+                          <strong style={{ fontSize: '0.9rem' }}>
+                            {match.result.candidateId || match.result.filename}
+                          </strong>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="analysis-summary__item analysis-summary__item--accent">
@@ -305,35 +322,6 @@ export default function Home() {
           )}
 
           <AnalysisResult results={analysisResults} />
-
-          {analysisResults.length > 0 && (
-            <section className="card next-steps-card" aria-label="Siguientes pasos sugeridos">
-              <h2>Acciones recomendadas para el equipo</h2>
-              <ul className="next-steps-card__list">
-                <li>
-                  <CheckCircle2 size={18} aria-hidden="true" />
-                  <div>
-                    <strong>Agenda entrevistas focalizadas</strong>
-                    <p>Confirma hallazgos y valida información faltante detectada.</p>
-                  </div>
-                </li>
-                <li>
-                  <CheckCircle2 size={18} aria-hidden="true" />
-                  <div>
-                    <strong>Comparte el resumen ejecutivo</strong>
-                    <p>Exporta los highlights clave a tu equipo para documentación.</p>
-                  </div>
-                </li>
-                <li>
-                  <CheckCircle2 size={18} aria-hidden="true" />
-                  <div>
-                    <strong>Activa seguimiento ético</strong>
-                    <p>Utiliza las alertas marcadas para diseñar preguntas de riesgo.</p>
-                  </div>
-                </li>
-              </ul>
-            </section>
-          )}
         </div>
       </section>
 

@@ -24,12 +24,6 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 const TOKEN_KEY = 'agente-rh-token'
 const USER_KEY = 'agente-rh-user'
 
-// Logging para debuggear
-if (typeof window !== 'undefined') {
-  console.log('🔧 AuthContext - API_URL:', API_URL)
-  console.log('🔧 AuthContext - NEXT_PUBLIC_API_URL:', process.env.NEXT_PUBLIC_API_URL)
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [token, setToken] = useState<string | null>(null)
@@ -56,73 +50,64 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (username: string, password: string) => {
     try {
-      console.log('🔐 Iniciando login para:', username)
-      console.log('🔐 URL del API:', `${API_URL}/api/auth/login`)
+      // Crear un AbortController para timeout
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => {
+        controller.abort()
+      }, 30000) // 30 segundos
       
-      const response = await fetch(`${API_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ username, password }),
-      })
-
-      console.log('🔐 Respuesta recibida:', {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok,
-        headers: Object.fromEntries(response.headers.entries())
-      })
+      let response: Response
+      try {
+        response = await fetch(`${API_URL}/api/auth/login`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ username, password }),
+          signal: controller.signal,
+        })
+        clearTimeout(timeoutId)
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId)
+        if (fetchError.name === 'AbortError') {
+          throw new Error('La petición tardó demasiado. El servidor puede estar lento o no disponible.')
+        }
+        if (fetchError.message?.includes('Failed to fetch') || fetchError.message?.includes('NetworkError')) {
+          throw new Error('No se pudo conectar con el servidor. Verifica que el backend esté funcionando.')
+        }
+        throw fetchError
+      }
 
       if (!response.ok) {
         let errorMessage = 'Error al iniciar sesión'
         try {
           const error = await response.json()
           errorMessage = error.detail || errorMessage
-          console.error('🔐 Error del servidor:', error)
         } catch {
           errorMessage = `Error ${response.status}: ${response.statusText}`
-          console.error('🔐 Error al parsear respuesta:', errorMessage)
         }
         throw new Error(errorMessage)
       }
 
-      console.log('🔐 Parseando respuesta JSON...')
       const data = await response.json()
-      console.log('🔐 Datos recibidos:', { 
-        hasToken: !!data.access_token, 
-        hasUser: !!data.user,
-        user: data.user 
-      })
       
       // Guardar token y usuario en localStorage
-      console.log('🔐 Guardando en localStorage...')
       localStorage.setItem(TOKEN_KEY, data.access_token)
       localStorage.setItem(USER_KEY, JSON.stringify(data.user))
       
       // También establecer cookie para el middleware de Next.js
       document.cookie = `agente-rh-token=${data.access_token}; path=/; max-age=${8 * 60 * 60}; SameSite=Lax`
-      console.log('🔐 Cookie establecida')
       
-      console.log('🔐 Actualizando estado...')
       setToken(data.access_token)
       setUser(data.user)
       
-      console.log('🔐 Estado actualizado, esperando un momento antes de redirigir...')
       // Pequeño delay para asegurar que el estado se actualice
       await new Promise(resolve => setTimeout(resolve, 100))
       
-      console.log('🔐 Redirigiendo a /...')
-      // Usar window.location para una redirección más confiable
+      // Redirigir a la página principal
       window.location.href = '/'
-      console.log('🔐 Login completado exitosamente')
     } catch (error: any) {
-      console.error('🔐 Login error completo:', error)
-      console.error('🔐 Stack trace:', error.stack)
-      // Mejorar mensajes de error
-      if (error.message?.includes('fetch')) {
-        throw new Error('No se pudo conectar con el servidor. Por favor, intenta nuevamente.')
-      }
+      console.error('Login error:', error)
       throw error
     }
   }

@@ -193,11 +193,12 @@ export function AnalysisResult({ results }: Props) {
                             )}
                           </div>
                           <p>{criterion.value}</p>
-                          {contribution !== null && (
-                            <div className="criterion-bar__track" aria-hidden="true">
-                              <div style={{ width: `${Math.min(100, contribution)}%` }} />
-                            </div>
-                          )}
+                      {contribution !== null && (
+                        <div className="criterion-bar__track">
+                          <div style={{ width: `${Math.min(100, contribution)}%` }} />
+                          <span>{contribution}%</span>
+                        </div>
+                      )}
                         </div>
                       )
                     })}

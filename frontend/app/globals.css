@@ -1196,7 +1196,8 @@ button {
 }
 
 .criterion-bar__track {
-  height: 6px;
+  position: relative;
+  height: 12px;
   border-radius: 999px;
   background: rgba(148, 163, 184, 0.3);
   overflow: hidden;
@@ -1205,6 +1206,19 @@ button {
 .criterion-bar__track div {
   height: 100%;
   background: linear-gradient(135deg, var(--brand-primary), var(--brand-accent));
+}
+
+.criterion-bar__track span {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #f8fafc;
+  text-shadow: 0 0 4px rgba(15, 23, 42, 0.35);
+  pointer-events: none;
+  white-space: nowrap;
 }
 
 .confidence-card {

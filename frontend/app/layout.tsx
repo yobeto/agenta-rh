@@ -1,7 +1,6 @@
 import './globals.css'
 import type { Metadata } from 'next'
 import { AuthProvider } from '@/contexts/AuthContext'
-import { DebugInfo } from '@/components/DebugInfo'
 
 export const metadata: Metadata = {
   title: 'agente-rh',
@@ -18,7 +17,6 @@ export default function RootLayout({
       <body className="bg-slate-50 text-slate-800 min-h-screen">
         <AuthProvider>
           {children}
-          <DebugInfo />
         </AuthProvider>
       </body>
     </html>

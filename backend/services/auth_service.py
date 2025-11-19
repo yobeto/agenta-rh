@@ -31,9 +31,14 @@ ALLOWED_DEPARTMENTS = ["RH", "Recursos Humanos", "Recursos Humanos y Talento", "
 # Base de datos de usuarios (en producción usar una BD real)
 # Formato: {username: {"password_hash": "...", "email": "...", "role": "...", "department": "..."}}
 # Hashes pre-generados con bcrypt
+# 
+# Para cambiar la contraseña del admin:
+# 1. Ejecuta: docker-compose exec backend python3 update_admin_password.py "TU_NUEVA_CONTRASEÑA"
+# 2. O dentro del contenedor: python3 -c "import bcrypt; print(bcrypt.hashpw('TU_CONTRASEÑA'.encode('utf-8'), bcrypt.gensalt()).decode('utf-8'))"
+# 3. Actualiza el hash en la línea siguiente
 USERS_DB: Dict[str, Dict[str, str]] = {
     "admin": {
-        "password_hash": "$2b$12$nLaleoo5qDLEUQBMfr0DkOblpiYvx7chSKKbzYXy5lVRWdcPnNDEm",  # admin123
+        "password_hash": "$2b$12$bhQIa.cKhwISeD7GWLU25.XP8BVciItioj6iemXOEUZvyTGjabNFi",  # Admin@2024!
         "email": "admin@inbursa.com",
         "role": "admin",
         "department": "RH"
