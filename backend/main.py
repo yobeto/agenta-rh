@@ -18,6 +18,7 @@ from services.ethical_validator import EthicalValidator
 from services.chat_service import ChatService
 from services.auth_service import authenticate_user, create_access_token, create_user
 from services.audit_service import log_candidate_action, get_audit_log, get_candidate_history
+from services.position_service import position_service
 from middleware.auth_middleware import get_current_user, get_current_admin_user
 from models.schemas import (
     CandidateAnalysisRequest,
@@ -92,6 +93,8 @@ app.add_middleware(
 candidate_analyzer = CandidateAnalyzer()
 ethical_validator = EthicalValidator()
 chat_service = ChatService()
+# position_service se inicializa automáticamente e importa los PDFs
+logger.info("Servicios inicializados. Posiciones cargadas automáticamente desde PDFs.")
 
 
 @app.get("/")
@@ -473,6 +476,86 @@ async def get_candidate_history_endpoint(
         raise HTTPException(
             status_code=500,
             detail="Error interno al obtener el historial"
+        )
+
+
+# ============================================================================
+# POSITIONS ENDPOINTS
+# ============================================================================
+
+@app.get("/api/positions")
+async def list_positions(
+    status: Optional[str] = "active",
+    department: Optional[str] = None,
+    search: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Lista posiciones disponibles
+    Filtros opcionales: status, department, search
+    """
+    try:
+        positions = position_service.list_positions(
+            status=status,
+            department=department,
+            search=search
+        )
+        return {
+            "positions": positions,
+            "total": len(positions)
+        }
+    except Exception as e:
+        logger.error(f"Error listando posiciones: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Error interno al listar posiciones"
+        )
+
+
+@app.get("/api/positions/{position_id}")
+async def get_position(
+    position_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Obtiene una posición específica por ID"""
+    try:
+        position = position_service.get_position(position_id)
+        if not position:
+            raise HTTPException(
+                status_code=404,
+                detail="Posición no encontrada"
+            )
+        return position
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error obteniendo posición {position_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Error interno al obtener la posición"
+        )
+
+
+@app.post("/api/positions/reload")
+async def reload_positions(
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """
+    Recarga posiciones desde PDFs en la carpeta (solo admin)
+    Útil para actualizar posiciones después de agregar nuevos PDFs
+    """
+    try:
+        created = position_service.load_pdfs_from_directory()
+        return {
+            "message": f"Posiciones recargadas exitosamente",
+            "created": len(created),
+            "positions": created
+        }
+    except Exception as e:
+        logger.error(f"Error recargando posiciones: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Error interno al recargar posiciones"
         )
 
 
