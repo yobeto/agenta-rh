@@ -52,6 +52,7 @@ export interface ChatResponsePayload {
 }
 
 export interface ChatMessageItem {
+  id?: string
   type: 'user' | 'assistant'
   message: string
   timestamp?: string

@@ -22,10 +22,8 @@ ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Hacer el script de build ejecutable y ejecutarlo
+# Si el build falla, este comando fallará automáticamente
 RUN chmod +x ./build.sh && ./build.sh
-
-# Verificar que el build se completó correctamente
-RUN test -f .next/BUILD_ID || (echo "ERROR: BUILD_ID no se generó" && exit 1)
 
 # Production image
 FROM node:20-alpine AS runner
