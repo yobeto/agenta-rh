@@ -106,6 +106,10 @@ class CandidateAnalysisResult(BaseModel):
         default=True,
         description="Indica si el análisis cumple con principios éticos"
     )
+    risks: Optional[List[dict]] = Field(
+        default=None,
+        description="Riesgos identificados en el análisis, con categoría y nivel"
+    )
     
     class Config:
         json_schema_extra = {

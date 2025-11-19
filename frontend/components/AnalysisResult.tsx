@@ -397,15 +397,48 @@ export function AnalysisResult({ results }: Props) {
             .sort((a, b) => (b.weight ?? 0) - (a.weight ?? 0))
             .slice(0, 3)
             .filter(criterion => criterion.value)
-          const riskItems = [] as string[]
-          if (result.ethical_compliance === false) {
-            riskItems.push('Requiere revisión ética antes de avanzar.')
+          // Procesar riesgos estructurados
+          const riskItems = [] as Array<{category: string, level: string, description: string}>
+          const riskLabels: Record<string, string> = {
+            'técnico': 'Técnico',
+            'experiencia': 'Experiencia',
+            'formación': 'Formación',
+            'área_funcional': 'Área Funcional',
+            'cumplimiento': 'Cumplimiento'
           }
-          if (result.missing_information && result.missing_information.length > 0) {
-            riskItems.push(...result.missing_information)
-          }
-          if (riskItems.length === 0) {
-            riskItems.push('Sin alertas relevantes detectadas.')
+          
+          // Si hay riesgos estructurados, usarlos
+          if (result.risks && Array.isArray(result.risks) && result.risks.length > 0) {
+            riskItems.push(...result.risks.map((r: any) => ({
+              category: riskLabels[r.category] || r.category || 'General',
+              level: r.level || 'medio',
+              description: r.description || 'Riesgo no especificado'
+            })))
+          } else {
+            // Fallback: usar missing_information como riesgos
+            if (result.ethical_compliance === false) {
+              riskItems.push({
+                category: 'Cumplimiento',
+                level: 'alto',
+                description: 'Requiere revisión ética antes de avanzar.'
+              })
+            }
+            if (result.missing_information && result.missing_information.length > 0) {
+              result.missing_information.forEach((info: string) => {
+                riskItems.push({
+                  category: 'Cumplimiento',
+                  level: 'medio',
+                  description: info
+                })
+              })
+            }
+            if (riskItems.length === 0) {
+              riskItems.push({
+                category: 'General',
+                level: 'bajo',
+                description: 'Sin alertas relevantes detectadas.'
+              })
+            }
           }
           const followUps = result.missing_information && result.missing_information.length > 0
             ? result.missing_information
@@ -600,9 +633,67 @@ export function AnalysisResult({ results }: Props) {
                 <div>
                   <h4>Riesgos y alertas</h4>
                   <ul>
-                    {riskItems.map((item, index) => (
-                      <li key={`${cardId}-risk-${index}`}>{item}</li>
-                    ))}
+                    {riskItems.length > 0 ? (
+                      riskItems.map((item, index) => {
+                        const levelColors: Record<string, {bg: string, text: string, border: string}> = {
+                          'alto': { bg: 'rgba(239, 68, 68, 0.1)', text: '#dc2626', border: 'rgba(239, 68, 68, 0.3)' },
+                          'medio': { bg: 'rgba(245, 158, 11, 0.1)', text: '#d97706', border: 'rgba(245, 158, 11, 0.3)' },
+                          'bajo': { bg: 'rgba(148, 163, 184, 0.1)', text: '#64748b', border: 'rgba(148, 163, 184, 0.3)' }
+                        }
+                        const colors = levelColors[item.level] || levelColors['medio']
+                        return (
+                          <li 
+                            key={`${cardId}-risk-${index}`}
+                            style={{
+                              padding: '0.75rem',
+                              marginBottom: '0.5rem',
+                              background: colors.bg,
+                              border: `1px solid ${colors.border}`,
+                              borderRadius: '0.5rem',
+                              borderLeft: `4px solid ${colors.text}`
+                            }}
+                          >
+                            <div style={{ 
+                              display: 'flex', 
+                              alignItems: 'flex-start', 
+                              gap: '0.5rem',
+                              flexWrap: 'wrap'
+                            }}>
+                              <span style={{
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                color: colors.text,
+                                textTransform: 'uppercase',
+                                padding: '0.25rem 0.5rem',
+                                background: colors.bg,
+                                borderRadius: '0.25rem',
+                                border: `1px solid ${colors.border}`
+                              }}>
+                                {item.level}
+                              </span>
+                              <span style={{
+                                fontSize: '0.75rem',
+                                fontWeight: 500,
+                                color: '#64748b'
+                              }}>
+                                {item.category}
+                              </span>
+                            </div>
+                            <p style={{
+                              marginTop: '0.5rem',
+                              marginBottom: 0,
+                              fontSize: '0.875rem',
+                              color: '#1e293b',
+                              lineHeight: '1.5'
+                            }}>
+                              {item.description}
+                            </p>
+                          </li>
+                        )
+                      })
+                    ) : (
+                      <li>Sin alertas relevantes detectadas.</li>
+                    )}
                   </ul>
                 </div>
               </div>

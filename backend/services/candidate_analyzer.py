@@ -84,31 +84,58 @@ class CandidateAnalyzer:
         """
         return f"""Eres un asistente de Recursos Humanos para agente-rh. Tu función es COMPARAR DIRECTAMENTE el CV del candidato con los REQUISITOS ESPECÍFICOS del Job Description.
 
-MÉTODO DE ANÁLISIS (OBLIGATORIO):
+MÉTODO DE ANÁLISIS (OBLIGATORIO - SEGUIR EN ORDEN):
 
-1. IDENTIFICA REQUISITOS CLAVE del Job Description:
-   - Título del puesto y área funcional
-   - Años de experiencia requeridos
-   - Educación/certificaciones obligatorias
-   - Habilidades técnicas específicas
-   - Competencias o conocimientos especializados
-   - Responsabilidades principales
+PASO 1: IDENTIFICA REQUISITOS CLAVE del Job Description:
+   - Título del puesto y área funcional (ej: "Desarrollador Backend", "Analista Financiero")
+   - Años de experiencia requeridos (específicos, no aproximados)
+   - Educación/certificaciones obligatorias (títulos, certificaciones específicas)
+   - Habilidades técnicas específicas (lenguajes, herramientas, tecnologías)
+   - Competencias o conocimientos especializados (dominios, metodologías)
+   - Responsabilidades principales (qué hará en el puesto)
 
-2. COMPARA PUNTO POR PUNTO con el CV:
-   - ¿El candidato tiene la experiencia requerida? (años, tipo de experiencia)
-   - ¿Tiene la educación/certificaciones necesarias?
-   - ¿Posee las habilidades técnicas mencionadas en el JD?
-   - ¿Su experiencia previa está relacionada con las responsabilidades del puesto?
+PASO 2: VERIFICA ÁREA FUNCIONAL (CRÍTICO):
+   - Identifica el área funcional del JD (ej: Desarrollo de Software, Finanzas, Marketing, RH)
+   - Identifica el área funcional del CV (basado en experiencia previa)
+   - Si las áreas son COMPLETAMENTE DIFERENTES y NO transferibles:
+     * Ejemplo: JD es "Desarrollador Backend" y CV es "Diseñador UX" → "insufficient"
+     * Ejemplo: JD es "Analista Financiero" y CV es "Marketing" → "insufficient"
+     * Ejemplo: JD es "Gerente de RH" y CV es "Desarrollador" → "insufficient"
+   - Si las áreas son DIFERENTES pero POTENCIALMENTE TRANSFERIBLES:
+     * Ejemplo: JD es "Analista de Datos en Banca" y CV es "Analista de Datos en Retail" → evaluar habilidades transferibles
+     * Ejemplo: JD es "Desarrollador Python" y CV es "Desarrollador Java" → evaluar si las habilidades son transferibles
 
-3. EVALÚA COINCIDENCIAS REALES:
-   - Coincidencia EXACTA: El CV menciona específicamente lo que el JD requiere
-   - Coincidencia PARCIAL: El CV tiene algo relacionado pero no exacto
-   - Sin coincidencia: El CV no menciona nada relacionado
+PASO 3: COMPARA PUNTO POR PUNTO con el CV:
+   Para CADA requisito del JD, verifica:
+   - ¿El candidato tiene la experiencia requerida? (años EXACTOS, tipo de experiencia ESPECÍFICO)
+   - ¿Tiene la educación/certificaciones necesarias? (título ESPECÍFICO, certificación ESPECÍFICA)
+   - ¿Posee las habilidades técnicas mencionadas en el JD? (lenguaje/herramienta ESPECÍFICA)
+   - ¿Su experiencia previa está relacionada con las responsabilidades del puesto? (responsabilidades ESPECÍFICAS)
 
-4. PENALIZA AUSENCIAS:
+PASO 4: EVALÚA COINCIDENCIAS REALES (SÉ ESTRICTO):
+   - Coincidencia EXACTA: El CV menciona ESPECÍFICAMENTE lo que el JD requiere
+     * Ejemplo: JD requiere "5 años en Python", CV muestra "6 años en Python" → EXACTA
+   - Coincidencia PARCIAL: El CV tiene algo relacionado pero NO exacto
+     * Ejemplo: JD requiere "5 años en Python", CV muestra "3 años en Java" → PARCIAL (lenguaje diferente)
+     * Ejemplo: JD requiere "Ingeniería en Sistemas", CV muestra "Ingeniería en Computación" → PARCIAL (similar pero no exacto)
+   - Sin coincidencia: El CV NO menciona nada relacionado
+     * Ejemplo: JD requiere "Python", CV muestra solo "Java y C++" → NINGUNA
+     * Ejemplo: JD requiere "Experiencia en banca", CV muestra solo "Retail" → NINGUNA (a menos que sea transferible)
+
+PASO 5: CALCULA MÉTRICAS DE COINCIDENCIA:
+   - Cuenta cuántos requisitos OBLIGATORIOS del JD se cumplen
+   - Cuenta cuántos requisitos OBLIGATORIOS del JD NO se cumplen
+   - Calcula el porcentaje: (requisitos cumplidos / total requisitos obligatorios) × 100
+   - Si el porcentaje es < 50%, el nivel DEBE ser "low" o "insufficient"
+   - Si el porcentaje es 50-70%, el nivel DEBE ser "medium" o "low"
+   - Si el porcentaje es > 70% Y hay coincidencias EXACTAS, puede ser "high" o "medium"
+
+PASO 6: PENALIZA AUSENCIAS (OBLIGATORIO):
    - Si faltan requisitos OBLIGATORIOS del JD, el candidato NO puede tener un score alto
-   - Si el CV está en un área completamente diferente, usa "insufficient" o "low"
-   - Si hay más diferencias que coincidencias, el nivel debe ser "low" o "insufficient"
+   - Si el CV está en un área completamente diferente, usa "insufficient"
+   - Si hay más requisitos NO cumplidos que cumplidos, el nivel DEBE ser "low" o "insufficient"
+   - Si faltan MÁS DE 2 requisitos obligatorios, el nivel NO puede ser "high"
+   - Si el área funcional es diferente y NO transferible, el nivel DEBE ser "insufficient"
 
 REGLAS ESTRICTAS DE ÉTICA Y EQUIDAD:
 
@@ -174,6 +201,33 @@ REGLAS ESTRICTAS DE ÉTICA Y EQUIDAD:
    - Asigna pesos bajos (0.1-0.15) a requisitos deseables o complementarios
    - La suma de pesos debe aproximarse a 1.0
 
+EJEMPLOS DE COMPARACIÓN (REFERENCIA):
+
+EJEMPLO 1 - COINCIDENCIA EXACTA (BUENO):
+JD requiere: "5 años en desarrollo Python, experiencia en Django, Ingeniería en Sistemas"
+CV muestra: "6 años desarrollando en Python, 4 años usando Django, Ingeniería en Sistemas"
+Resultado: Coincidencia EXACTA en todos los requisitos → "high"
+
+EJEMPLO 2 - SIN COINCIDENCIA (MALO):
+JD requiere: "5 años en desarrollo Python, experiencia en banca"
+CV muestra: "3 años en Java, 2 años en C++, experiencia en retail"
+Resultado: Lenguaje diferente (Python vs Java), industria diferente (banca vs retail) → "insufficient"
+
+EJEMPLO 3 - COINCIDENCIA PARCIAL:
+JD requiere: "5 años en desarrollo Python"
+CV muestra: "3 años en Java, conocimiento básico de Python"
+Resultado: Experiencia insuficiente (3 años vs 5 requeridos), lenguaje parcialmente relacionado → "low"
+
+EJEMPLO 4 - ÁREA FUNCIONAL DIFERENTE:
+JD requiere: "Desarrollador Backend Python"
+CV muestra: "Diseñador UX con 5 años de experiencia"
+Resultado: Área funcional completamente diferente (desarrollo vs diseño) → "insufficient"
+
+EJEMPLO 5 - TRANSFERIBLE:
+JD requiere: "Analista de Datos en sector financiero, Python, SQL"
+CV muestra: "Analista de Datos en retail, Python, SQL, 4 años"
+Resultado: Mismas habilidades técnicas, industria diferente pero transferible → "medium"
+
 JOB DESCRIPTION (referencia principal - REQUISITOS A CUMPLIR):
 
 {job_description}
@@ -182,47 +236,128 @@ CV ANALIZADO ({filename} - COMPARAR CON REQUISITOS ARRIBA):
 
 {cv_content}
 
-INSTRUCCIONES FINALES:
+INSTRUCCIONES FINALES (SEGUIR EN ORDEN):
 
-1. Compara CADA requisito del JD con el CV de manera objetiva y justa
-2. Si el CV NO menciona algo que el JD requiere, indícalo claramente pero sin juicios de valor
-3. Si el CV está en un área diferente, evalúa si es transferible de manera justa y objetiva
-4. Si hay más requisitos NO cumplidos que cumplidos, el nivel debe ser "low" o "insufficient"
-5. Sé ESTRICTO: no des puntajes altos por "buena actitud" o "experiencia general" si no cumple requisitos específicos
-6. EQUIDAD: Si un candidato tiene experiencia transferible pero en diferente industria, evalúa las habilidades, no el "prestigio" de la industria
-7. NO DISCRIMINACIÓN: No penalices por tener experiencia en industrias "menos prestigiosas" si las habilidades son relevantes
-8. VERIFICA SESGOS: Antes de responder, revisa si tu análisis podría estar sesgado por:
-   - Prejuicios sobre tipos de experiencia o industrias
-   - Asunciones sobre qué es "mejor" sin justificación objetiva
-   - Estereotipos sobre tipos de educación o formación
-   - Sesgos hacia ciertos tipos de trayectorias profesionales
+1. PRIMERO: Verifica el área funcional. Si es completamente diferente y NO transferible → "insufficient" inmediatamente
+
+2. SEGUNDO: Compara CADA requisito OBLIGATORIO del JD con el CV de manera objetiva y justa
+   - Para cada requisito, indica: "JD requiere X, CV muestra Y, Coincidencia: EXACTA/PARCIAL/NINGUNA"
+
+3. TERCERO: Calcula métricas:
+   - Total requisitos obligatorios en JD: ___
+   - Requisitos cumplidos (EXACTA o PARCIAL relevante): ___
+   - Requisitos NO cumplidos: ___
+   - Porcentaje de cumplimiento: ___%
+   - Si porcentaje < 50% → "insufficient" o "low"
+   - Si porcentaje 50-70% → "low" o "medium"
+   - Si porcentaje > 70% y hay coincidencias EXACTAS → "medium" o "high"
+
+4. CUARTO: Si el CV NO menciona algo que el JD requiere, indícalo claramente en "missing_information" pero sin juicios de valor
+
+5. QUINTO: Si el CV está en un área diferente, evalúa transferibilidad:
+   - Si las habilidades técnicas son las mismas pero la industria es diferente → puede ser transferible
+   - Si las habilidades técnicas son diferentes → NO es transferible
+   - Si el área funcional es diferente (ej: desarrollo vs diseño) → NO es transferible
+
+6. SEXTO: Reglas de penalización ESTRICTAS:
+   - Si hay MÁS requisitos NO cumplidos que cumplidos → nivel DEBE ser "low" o "insufficient"
+   - Si faltan MÁS DE 2 requisitos obligatorios → nivel NO puede ser "high"
+   - Si el área funcional es diferente y NO transferible → nivel DEBE ser "insufficient"
+   - NO des puntajes altos por "buena actitud", "experiencia general" o "potencial" si no cumple requisitos específicos
+
+7. SÉPTIMO: EQUIDAD Y NO DISCRIMINACIÓN:
+   - Si un candidato tiene experiencia transferible pero en diferente industria, evalúa las habilidades técnicas, NO el "prestigio" de la industria
+   - NO penalices por tener experiencia en industrias "menos prestigiosas" si las habilidades son relevantes
+   - Evalúa competencias, NO el nombre de la universidad o empresa previa
+
+8. OCTAVO: VERIFICA SESGOS antes de responder:
+   - ¿Estoy asumiendo que ciertos tipos de experiencia son "mejores" sin justificación objetiva?
+   - ¿Estoy penalizando por industria o tipo de empresa sin razón técnica?
+   - ¿Estoy usando estereotipos sobre tipos de educación o formación?
+   - ¿Mi análisis está basado en hechos objetivos o en prejuicios?
+
+EVALUACIÓN DE RIESGOS (OBLIGATORIO):
+
+Identifica y categoriza los riesgos encontrados en el análisis. Los riesgos pueden ser:
+
+1. RIESGOS TÉCNICOS:
+   - Falta de habilidades técnicas específicas requeridas
+   - Experiencia insuficiente en tecnologías críticas
+   - Brechas en conocimientos técnicos obligatorios
+
+2. RIESGOS DE EXPERIENCIA:
+   - Años de experiencia por debajo del mínimo requerido
+   - Falta de experiencia en industria/sector específico
+   - Ausencia de experiencia en responsabilidades clave
+
+3. RIESGOS DE FORMACIÓN:
+   - Falta de educación/certificaciones obligatorias
+   - Título/área de estudio no alineada con requisitos
+   - Certificaciones vencidas o no mencionadas
+
+4. RIESGOS DE ÁREA FUNCIONAL:
+   - Área funcional completamente diferente y no transferible
+   - Cambio de carrera sin justificación de transferibilidad
+   - Falta de experiencia en el tipo de rol
+
+5. RIESGOS DE CUMPLIMIENTO:
+   - Múltiples requisitos obligatorios no cumplidos
+   - Porcentaje de cumplimiento muy bajo (<50%)
+   - Más requisitos faltantes que cumplidos
+
+Para cada riesgo identificado, indica:
+- "category": "técnico|experiencia|formación|área_funcional|cumplimiento"
+- "level": "alto|medio|bajo" (alto: bloqueante, medio: importante, bajo: menor)
+- "description": "Descripción específica del riesgo y su impacto"
 
 FORMATO DE RESPUESTA (OBLIGATORIO):
 
 Responde EXACTAMENTE en este formato JSON:
 
 {{
-  "recommendation": "(a) Tu recomendación objetiva. Menciona específicamente qué requisitos del JD cumple y cuáles no. Si no cumple requisitos principales, indícalo claramente.",
+  "recommendation": "(a) Tu recomendación objetiva. DEBE incluir: 1) Área funcional del JD vs CV y si es transferible, 2) Lista específica de qué requisitos del JD cumple (con detalles), 3) Lista específica de qué requisitos NO cumple (con detalles), 4) Porcentaje estimado de cumplimiento. Si no cumple requisitos principales, indícalo claramente.",
   "objective_criteria": [
     {{
       "name": "Nombre del criterio (ej: 'Experiencia en Python')",
-      "value": "Comparación específica: JD requiere X, CV muestra Y. Coincidencia: EXACTA/PARCIAL/NINGUNA",
+      "value": "Comparación específica: JD requiere X, CV muestra Y. Coincidencia: EXACTA/PARCIAL/NINGUNA. Justificación: [por qué es exacta/parcial/ninguna]",
       "weight": 0.35
     }}
   ],
   "confidence_level": "high|medium|low|insufficient",
-  "confidence_explanation": "Explicación detallada: por qué este nivel basado en la comparación JD vs CV",
-  "missing_information": ["Requisito del JD que NO está en el CV", "Otro requisito faltante"]
+  "confidence_explanation": "Explicación detallada DEBE incluir: 1) Área funcional: [coincide/diferente/transferible], 2) Requisitos cumplidos: X de Y, 3) Porcentaje de cumplimiento: Z%, 4) Razón del nivel asignado basado en las métricas calculadas",
+  "missing_information": ["Requisito OBLIGATORIO del JD que NO está en el CV (específico)", "Otro requisito obligatorio faltante (específico)"],
+  "risks": [
+    {{
+      "category": "técnico|experiencia|formación|área_funcional|cumplimiento",
+      "level": "alto|medio|bajo",
+      "description": "Descripción específica del riesgo y su impacto potencial en el desempeño del puesto"
+    }}
+  ]
 }}
 
+VALIDACIÓN FINAL (ANTES DE RESPONDER):
+
+✓ Verifiqué el área funcional: [coincide/diferente/transferible]
+✓ Conté requisitos obligatorios del JD: [número]
+✓ Conté requisitos cumplidos: [número]
+✓ Calculé porcentaje de cumplimiento: [%]
+✓ Verifiqué que el nivel de confianza coincida con las métricas
+✓ Verifiqué que no haya sesgos en mi evaluación
+✓ Verifiqué que no use lenguaje subjetivo
+✓ Verifiqué que no infiera atributos personales
+✓ Verifiqué que cada criterio muestre comparación específica JD vs CV
+
 IMPORTANTE:
-- La recomendación debe mencionar QUÉ requisitos del JD se cumplen y CUÁLES NO
-- Los criterios deben mostrar la comparación directa JD vs CV
-- El nivel de confianza debe reflejar la REAL coincidencia entre JD y CV
-- Si faltan requisitos OBLIGATORIOS, el nivel debe ser "low" o "insufficient"
+- La recomendación DEBE mencionar: área funcional, requisitos cumplidos (lista), requisitos NO cumplidos (lista), porcentaje de cumplimiento
+- Los criterios DEBEN mostrar: "JD requiere X, CV muestra Y, Coincidencia: [tipo], Justificación: [razón]"
+- El nivel de confianza DEBE reflejar las métricas calculadas (porcentaje de cumplimiento)
+- Si faltan requisitos OBLIGATORIOS, el nivel DEBE ser "low" o "insufficient"
+- Si el porcentaje de cumplimiento es < 50%, el nivel DEBE ser "insufficient" o "low"
+- Si el área funcional es diferente y NO transferible, el nivel DEBE ser "insufficient"
 - NO uses lenguaje subjetivo ni adjetivos de valor
 - NO infieras atributos personales
 - NO asumas que "experiencia general" es suficiente si el JD requiere algo específico
+- NO des puntajes altos sin coincidencias reales y específicas
 - Recuerda: esto es APOYO, no una decisión final"""
     
     async def _call_ai(self, prompt: str, model_id: Optional[str] = None) -> str:
@@ -343,6 +478,81 @@ IMPORTANTE:
                 else:
                     confidence = ConfidenceLevel.MEDIUM
                 
+                # VALIDACIÓN POST-ANÁLISIS: Ajustar nivel si hay inconsistencias
+                missing_info = data.get("missing_information", [])
+                missing_count = len(missing_info) if missing_info else 0
+                
+                # Si el nivel es "high" pero hay más de 2 requisitos faltantes, ajustar
+                if confidence == ConfidenceLevel.HIGH and missing_count > 2:
+                    logger.warning(
+                        f"Inconsistencia detectada: confidence_level='high' pero hay {missing_count} requisitos faltantes. "
+                        f"Ajustando a 'medium' para candidato {candidate_id or filename}"
+                    )
+                    confidence = ConfidenceLevel.MEDIUM
+                
+                # Si el nivel es "high" o "medium" pero hay más de 3 requisitos faltantes, ajustar a "low"
+                if confidence in [ConfidenceLevel.HIGH, ConfidenceLevel.MEDIUM] and missing_count > 3:
+                    logger.warning(
+                        f"Inconsistencia detectada: confidence_level='{confidence.value}' pero hay {missing_count} requisitos faltantes. "
+                        f"Ajustando a 'low' para candidato {candidate_id or filename}"
+                    )
+                    confidence = ConfidenceLevel.LOW
+                
+                # Si hay más de 5 requisitos faltantes, forzar "insufficient"
+                if missing_count > 5:
+                    logger.warning(
+                        f"Muchos requisitos faltantes ({missing_count}). Ajustando a 'insufficient' para candidato {candidate_id or filename}"
+                    )
+                    confidence = ConfidenceLevel.INSUFFICIENT
+                
+                # Verificar que haya criterios objetivos
+                if not criteria or len(criteria) == 0:
+                    logger.warning(f"No se encontraron criterios objetivos para {candidate_id or filename}")
+                    # Crear criterio genérico
+                    criteria = [
+                        ObjectiveCriterion(
+                            name="Análisis general",
+                            value="Revisión manual requerida - criterios no especificados",
+                            weight=1.0
+                        )
+                    ]
+                
+                # Extraer riesgos identificados
+                risks_data = data.get("risks", [])
+                risks = []
+                if risks_data:
+                    for risk in risks_data:
+                        if isinstance(risk, dict):
+                            risks.append({
+                                "category": risk.get("category", "cumplimiento"),
+                                "level": risk.get("level", "medio"),
+                                "description": risk.get("description", "Riesgo no especificado")
+                            })
+                
+                # Si no hay riesgos explícitos pero hay muchos requisitos faltantes, generar riesgos automáticos
+                if not risks and missing_count > 0:
+                    if missing_count > 3:
+                        risks.append({
+                            "category": "cumplimiento",
+                            "level": "alto",
+                            "description": f"Faltan {missing_count} requisitos obligatorios del JD, lo que indica bajo nivel de alineación con el puesto"
+                        })
+                    elif missing_count > 1:
+                        risks.append({
+                            "category": "cumplimiento",
+                            "level": "medio",
+                            "description": f"Faltan {missing_count} requisitos obligatorios del JD que podrían afectar el desempeño"
+                        })
+                
+                # Si el área funcional es diferente, agregar riesgo
+                confidence_explanation_lower = data.get("confidence_explanation", "").lower()
+                if "área funcional" in confidence_explanation_lower and ("diferente" in confidence_explanation_lower or "no transferible" in confidence_explanation_lower):
+                    risks.append({
+                        "category": "área_funcional",
+                        "level": "alto",
+                        "description": "El área funcional del CV no coincide con el JD y no es transferible"
+                    })
+                
                 return CandidateAnalysisResult(
                     candidateId=candidate_id,
                     filename=filename,
@@ -350,8 +560,9 @@ IMPORTANTE:
                     objective_criteria=criteria,
                     confidence_level=confidence,
                     confidence_explanation=data.get("confidence_explanation", ""),
-                    missing_information=data.get("missing_information"),
-                    ethical_compliance=True
+                    missing_information=missing_info,
+                    ethical_compliance=True,
+                    risks=risks if risks else None
                 )
             except json.JSONDecodeError:
                 logger.warning("No se pudo parsear JSON de la respuesta de IA")
@@ -371,5 +582,10 @@ IMPORTANTE:
             confidence_level=ConfidenceLevel.INSUFFICIENT,
             confidence_explanation="No se pudo procesar la respuesta de IA correctamente",
             missing_information=["Formato de respuesta válido de IA"],
-            ethical_compliance=True
+            ethical_compliance=True,
+            risks=[{
+                "category": "cumplimiento",
+                "level": "alto",
+                "description": "No se pudo procesar correctamente la respuesta de IA, requiere revisión manual"
+            }]
         )
