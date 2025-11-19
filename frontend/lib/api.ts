@@ -5,6 +5,9 @@ import type {
   AIModel,
   ChatRequestPayload,
   ChatResponsePayload,
+  CandidateActionRequest,
+  CandidateActionResponse,
+  AuditLogResponse,
 } from '@/types'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -93,5 +96,25 @@ export async function createUser(payload: {
   role?: string
 }) {
   const response = await apiClient.post('/api/auth/create-user', payload)
+  return response.data
+}
+
+export async function registerCandidateAction(payload: CandidateActionRequest): Promise<CandidateActionResponse> {
+  const response = await apiClient.post<CandidateActionResponse>('/api/candidates/action', payload)
+  return response.data
+}
+
+export async function getAuditLog(params?: {
+  username?: string
+  candidate_id?: string
+  action?: string
+  limit?: number
+}): Promise<AuditLogResponse> {
+  const response = await apiClient.get<AuditLogResponse>('/api/audit/log', { params })
+  return response.data
+}
+
+export async function getCandidateHistory(candidateId: string): Promise<AuditLogResponse> {
+  const response = await apiClient.get<AuditLogResponse>(`/api/candidates/${candidateId}/history`)
   return response.data
 }

@@ -17,6 +17,7 @@ from services.candidate_analyzer import CandidateAnalyzer
 from services.ethical_validator import EthicalValidator
 from services.chat_service import ChatService
 from services.auth_service import authenticate_user, create_access_token, create_user
+from services.audit_service import log_candidate_action, get_audit_log, get_candidate_history
 from middleware.auth_middleware import get_current_user, get_current_admin_user
 from models.schemas import (
     CandidateAnalysisRequest,
@@ -27,6 +28,10 @@ from models.schemas import (
     LoginResponse,
     CreateUserRequest,
     CreateUserResponse,
+    CandidateActionRequest,
+    CandidateActionResponse,
+    AuditLogResponse,
+    AuditLogEntry,
 )
 from utils.pdf_parser import extract_text_from_pdf
 from datetime import timedelta
@@ -367,6 +372,108 @@ async def get_ethical_principles():
         ],
         "values": "Confianza, transparencia y ética - Valores de agente-rh"
     }
+
+
+# ============================================================================
+# CANDIDATE ACTIONS ENDPOINTS
+# ============================================================================
+
+@app.post("/api/candidates/action", response_model=CandidateActionResponse)
+async def register_candidate_action(
+    action_request: CandidateActionRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Registra una acción sobre un candidato (pasar a entrevista, rechazar, en espera)
+    """
+    try:
+        # Validar que la acción sea válida
+        valid_actions = ['interview', 'rejected', 'on_hold']
+        if action_request.action not in valid_actions:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Acción inválida. Debe ser una de: {', '.join(valid_actions)}"
+            )
+        
+        action_record = log_candidate_action(
+            candidate_id=action_request.candidate_id,
+            candidate_filename=action_request.candidate_filename,
+            action=action_request.action,
+            username=current_user['username'],
+            notes=action_request.notes
+        )
+        
+        return CandidateActionResponse(
+            candidate_id=action_record.candidate_id,
+            candidate_filename=action_record.candidate_filename,
+            action=action_record.action,
+            username=action_record.username,
+            timestamp=action_record.timestamp,
+            notes=action_record.notes,
+            message="Acción registrada exitosamente"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error registrando acción: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Error interno al registrar la acción"
+        )
+
+
+@app.get("/api/audit/log", response_model=AuditLogResponse)
+async def get_audit_log_endpoint(
+    username: Optional[str] = None,
+    candidate_id: Optional[str] = None,
+    action: Optional[str] = None,
+    limit: int = 100,
+    current_admin: dict = Depends(get_current_admin_user)
+):
+    """
+    Obtiene el log de auditoría de acciones sobre candidatos (solo administradores)
+    """
+    try:
+        entries = get_audit_log(
+            username=username,
+            candidate_id=candidate_id,
+            action=action,
+            limit=limit
+        )
+        
+        return AuditLogResponse(
+            entries=[AuditLogEntry(**entry) for entry in entries],
+            total=len(entries)
+        )
+    except Exception as e:
+        logger.error(f"Error obteniendo log de auditoría: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Error interno al obtener el log de auditoría"
+        )
+
+
+@app.get("/api/candidates/{candidate_id}/history", response_model=AuditLogResponse)
+async def get_candidate_history_endpoint(
+    candidate_id: str,
+    current_admin: dict = Depends(get_current_admin_user)
+):
+    """
+    Obtiene el historial completo de acciones sobre un candidato específico (solo administradores)
+    """
+    try:
+        entries = get_candidate_history(candidate_id)
+        
+        return AuditLogResponse(
+            entries=[AuditLogEntry(**entry) for entry in entries],
+            total=len(entries)
+        )
+    except Exception as e:
+        logger.error(f"Error obteniendo historial del candidato: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Error interno al obtener el historial"
+        )
 
 
 if __name__ == "__main__":

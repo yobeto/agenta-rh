@@ -197,3 +197,42 @@ class CreateUserResponse(BaseModel):
     department: str
     role: str
     message: str
+
+
+# ============================================================================
+# CANDIDATE ACTIONS SCHEMAS
+# ============================================================================
+
+class CandidateActionRequest(BaseModel):
+    """Solicitud para registrar una acción sobre un candidato"""
+    candidate_id: str = Field(..., description="ID del candidato")
+    candidate_filename: str = Field(..., description="Nombre del archivo del candidato")
+    action: str = Field(..., description="Acción: 'interview', 'rejected', 'on_hold'")
+    notes: Optional[str] = Field(default=None, description="Notas adicionales")
+
+
+class CandidateActionResponse(BaseModel):
+    """Respuesta de acción registrada"""
+    candidate_id: str
+    candidate_filename: str
+    action: str
+    username: str
+    timestamp: str
+    notes: Optional[str] = None
+    message: str = "Acción registrada exitosamente"
+
+
+class AuditLogEntry(BaseModel):
+    """Entrada del log de auditoría"""
+    candidate_id: str
+    candidate_filename: str
+    action: str
+    username: str
+    timestamp: str
+    notes: Optional[str] = None
+
+
+class AuditLogResponse(BaseModel):
+    """Respuesta del log de auditoría"""
+    entries: List[AuditLogEntry]
+    total: int

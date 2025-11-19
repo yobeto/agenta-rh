@@ -1,11 +1,21 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { CandidateAnalysisResult } from '@/types'
-import { AlertTriangle, CheckCircle2, ShieldCheck, Sparkles } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, ShieldCheck, Sparkles, Users, X, CheckCircle, Clock, XCircle } from 'lucide-react'
+import { registerCandidateAction } from '@/lib/api'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface Props {
   results: CandidateAnalysisResult[]
+}
+
+type CandidateStatus = 'pending' | 'interview' | 'rejected' | 'on_hold'
+
+interface CandidateAction {
+  candidateId: string
+  status: CandidateStatus
+  notes?: string
 }
 
 const confidenceLabels: Record<string, string> = {
@@ -50,13 +60,140 @@ function getScoreTone(score: number): 'alto' | 'medio' | 'bajo' {
 }
 
 export function AnalysisResult({ results }: Props) {
+  const { user } = useAuth()
   const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({})
+  const [selectedCandidates, setSelectedCandidates] = useState<Set<string>>(new Set())
+  const [candidateActions, setCandidateActions] = useState<Record<string, CandidateAction>>({})
+  const [showBulkActions, setShowBulkActions] = useState(false)
+
+  // Cargar acciones guardadas del localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('candidate-actions')
+    if (saved) {
+      try {
+        setCandidateActions(JSON.parse(saved))
+      } catch (e) {
+        console.error('Error loading candidate actions:', e)
+      }
+    }
+  }, [])
+
+  // Guardar acciones en localStorage
+  useEffect(() => {
+    if (Object.keys(candidateActions).length > 0) {
+      localStorage.setItem('candidate-actions', JSON.stringify(candidateActions))
+    }
+  }, [candidateActions])
 
   const toggleCard = (cardId: string) => {
     setExpandedCards(prev => ({
       ...prev,
       [cardId]: !prev[cardId],
     }))
+  }
+
+  const getCandidateId = (result: CandidateAnalysisResult) => {
+    return `${result.filename}-${result.candidateId || 'default'}`
+  }
+
+  const toggleSelection = (candidateId: string) => {
+    setSelectedCandidates(prev => {
+      const next = new Set(prev)
+      if (next.has(candidateId)) {
+        next.delete(candidateId)
+      } else {
+        next.add(candidateId)
+      }
+      return next
+    })
+  }
+
+  const selectAll = () => {
+    const allIds = new Set(results.map(r => getCandidateId(r)))
+    setSelectedCandidates(allIds)
+    setShowBulkActions(true)
+  }
+
+  const deselectAll = () => {
+    setSelectedCandidates(new Set())
+    setShowBulkActions(false)
+  }
+
+  const applyAction = async (candidateId: string, status: CandidateStatus, result: CandidateAnalysisResult) => {
+    try {
+      // Enviar al backend
+      await registerCandidateAction({
+        candidate_id: candidateId,
+        candidate_filename: result.filename,
+        action: status,
+      })
+      
+      // Actualizar estado local
+      setCandidateActions(prev => ({
+        ...prev,
+        [candidateId]: { candidateId, status }
+      }))
+      setSelectedCandidates(prev => {
+        const next = new Set(prev)
+        next.delete(candidateId)
+        return next
+      })
+    } catch (error) {
+      console.error('Error registrando acción:', error)
+      // Aún así actualizar el estado local para feedback inmediato
+      setCandidateActions(prev => ({
+        ...prev,
+        [candidateId]: { candidateId, status }
+      }))
+    }
+  }
+
+  const applyBulkAction = async (status: CandidateStatus) => {
+    const updates: Record<string, CandidateAction> = {}
+    const promises: Promise<void>[] = []
+    
+    selectedCandidates.forEach(id => {
+      // Encontrar el resultado correspondiente
+      const result = results.find(r => getCandidateId(r) === id)
+      if (result) {
+        promises.push(
+          registerCandidateAction({
+            candidate_id: id,
+            candidate_filename: result.filename,
+            action: status,
+          }).then(() => {
+            updates[id] = { candidateId: id, status }
+          }).catch(error => {
+            console.error(`Error registrando acción para ${id}:`, error)
+            // Aún así actualizar localmente
+            updates[id] = { candidateId: id, status }
+          })
+        )
+      }
+    })
+    
+    await Promise.all(promises)
+    setCandidateActions(prev => ({ ...prev, ...updates }))
+    setSelectedCandidates(new Set())
+    setShowBulkActions(false)
+  }
+
+  const getStatusLabel = (status: CandidateStatus): string => {
+    switch (status) {
+      case 'interview': return 'Pasar a entrevista'
+      case 'rejected': return 'Rechazar'
+      case 'on_hold': return 'En espera'
+      default: return 'Pendiente'
+    }
+  }
+
+  const getStatusIcon = (status: CandidateStatus) => {
+    switch (status) {
+      case 'interview': return <CheckCircle size={16} />
+      case 'rejected': return <XCircle size={16} />
+      case 'on_hold': return <Clock size={16} />
+      default: return null
+    }
   }
 
   return (
@@ -72,7 +209,87 @@ export function AnalysisResult({ results }: Props) {
             antes de avanzar a la siguiente etapa.
           </p>
         </div>
+        {results.length > 0 && (
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', marginTop: '1rem' }}>
+            <button
+              type="button"
+              onClick={selectedCandidates.size === results.length ? deselectAll : selectAll}
+              className="btn-outline"
+              style={{ fontSize: '0.875rem', padding: '0.5rem 1rem' }}
+            >
+              {selectedCandidates.size === results.length ? 'Deseleccionar todos' : 'Seleccionar todos'}
+            </button>
+            {selectedCandidates.size > 0 && (
+              <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                {selectedCandidates.size} candidato{selectedCandidates.size !== 1 ? 's' : ''} seleccionado{selectedCandidates.size !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* Panel de acciones en lote */}
+      {showBulkActions && selectedCandidates.size > 0 && (
+        <div className="card" style={{ 
+          marginBottom: '1.5rem', 
+          padding: '1rem 1.5rem',
+          background: 'linear-gradient(135deg, rgba(0, 59, 113, 0.05), rgba(0, 168, 89, 0.03))',
+          border: '1px solid rgba(0, 59, 113, 0.1)'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Users size={18} />
+              <strong>Acciones en lote ({selectedCandidates.size} candidatos)</strong>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowBulkActions(false)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.25rem' }}
+            >
+              <X size={18} />
+            </button>
+          </div>
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => applyBulkAction('interview')}
+              className="btn-primary"
+              style={{ fontSize: '0.875rem', padding: '0.625rem 1.25rem' }}
+            >
+              <CheckCircle size={16} style={{ marginRight: '0.5rem' }} />
+              Pasar a entrevista
+            </button>
+            <button
+              type="button"
+              onClick={() => applyBulkAction('on_hold')}
+              className="btn-outline"
+              style={{ fontSize: '0.875rem', padding: '0.625rem 1.25rem' }}
+            >
+              <Clock size={16} style={{ marginRight: '0.5rem' }} />
+              En espera
+            </button>
+            <button
+              type="button"
+              onClick={() => applyBulkAction('rejected')}
+              style={{ 
+                fontSize: '0.875rem', 
+                padding: '0.625rem 1.25rem',
+                background: 'rgba(239, 68, 68, 0.1)',
+                color: '#dc2626',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                borderRadius: '0.5rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              <XCircle size={16} />
+              Rechazar
+            </button>
+          </div>
+        </div>
+      )}
 
       {(!results || results.length === 0) && (
         <div className="status-empty status-empty--accent">
@@ -119,17 +336,32 @@ export function AnalysisResult({ results }: Props) {
             return acc
           }, 0)
 
+          const candidateId = getCandidateId(result)
+          const isSelected = selectedCandidates.has(candidateId)
+          const action = candidateActions[candidateId]
+
           return (
             <article key={cardId} className={`candidate-result candidate-result--${tone}`}>
               <header className="candidate-result__header">
-                <div className="candidate-result__identity">
-                  <div className={`candidate-result__score candidate-result__score--${tone}`}>
-                    <span>{score}</span>
-                    <small>/100</small>
-                  </div>
-                  <div>
-                    <h3>{result.candidateId || result.filename}</h3>
-                    <p>{result.filename}</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => {
+                      toggleSelection(candidateId)
+                      if (!isSelected) setShowBulkActions(true)
+                    }}
+                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                  />
+                  <div className="candidate-result__identity">
+                    <div className={`candidate-result__score candidate-result__score--${tone}`}>
+                      <span>{score}</span>
+                      <small>/100</small>
+                    </div>
+                    <div>
+                      <h3>{result.candidateId || result.filename}</h3>
+                      <p>{result.filename}</p>
+                    </div>
                   </div>
                 </div>
                 <div className="candidate-result__chips">
@@ -140,16 +372,132 @@ export function AnalysisResult({ results }: Props) {
                     {result.ethical_compliance === false ? 'Requiere revisión ética' : 'Cumplimiento ético'}
                   </span>
                 </div>
-                <button
-                  type="button"
-                  className="candidate-result__toggle"
-                  onClick={() => toggleCard(cardId)}
-                >
-                  {isExpanded ? 'Ocultar detalles' : 'Ver detalles'}
-                </button>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  {action && (
+                    <span style={{
+                      fontSize: '0.75rem',
+                      padding: '0.25rem 0.75rem',
+                      borderRadius: '999px',
+                      background: action.status === 'interview' 
+                        ? 'rgba(0, 168, 89, 0.1)' 
+                        : action.status === 'rejected'
+                        ? 'rgba(239, 68, 68, 0.1)'
+                        : 'rgba(148, 163, 184, 0.1)',
+                      color: action.status === 'interview'
+                        ? '#00a859'
+                        : action.status === 'rejected'
+                        ? '#dc2626'
+                        : '#64748b',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.25rem',
+                      fontWeight: 600
+                    }}>
+                      {getStatusIcon(action.status)}
+                      {getStatusLabel(action.status)}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    className="candidate-result__toggle"
+                    onClick={() => toggleCard(cardId)}
+                  >
+                    {isExpanded ? 'Ocultar detalles' : 'Ver detalles'}
+                  </button>
+                </div>
               </header>
 
               <p className="candidate-result__summary">{isExpanded ? result.recommendation : summary}</p>
+
+              {/* Acciones rápidas */}
+              <div style={{ 
+                display: 'flex', 
+                gap: '0.5rem', 
+                marginTop: '1rem',
+                paddingTop: '1rem',
+                borderTop: '1px solid rgba(148, 163, 184, 0.2)',
+                flexWrap: 'wrap'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => applyAction(candidateId, 'interview', result)}
+                  style={{
+                    fontSize: '0.875rem',
+                    padding: '0.5rem 1rem',
+                    background: action?.status === 'interview' 
+                      ? 'rgba(0, 168, 89, 0.15)' 
+                      : 'rgba(0, 168, 89, 0.08)',
+                    color: action?.status === 'interview' ? '#00a859' : '#00a859',
+                    border: `1px solid ${action?.status === 'interview' ? '#00a859' : 'rgba(0, 168, 89, 0.3)'}`,
+                    borderRadius: '0.5rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontWeight: 600,
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (action?.status !== 'interview') {
+                      e.currentTarget.style.background = 'rgba(0, 168, 89, 0.12)'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (action?.status !== 'interview') {
+                      e.currentTarget.style.background = 'rgba(0, 168, 89, 0.08)'
+                    }
+                  }}
+                >
+                  <CheckCircle size={16} />
+                  Pasar a entrevista
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyAction(candidateId, 'on_hold', result)}
+                  style={{
+                    fontSize: '0.875rem',
+                    padding: '0.5rem 1rem',
+                    background: action?.status === 'on_hold'
+                      ? 'rgba(148, 163, 184, 0.15)'
+                      : 'rgba(148, 163, 184, 0.08)',
+                    color: action?.status === 'on_hold' ? '#475569' : '#64748b',
+                    border: `1px solid ${action?.status === 'on_hold' ? '#94a3b8' : 'rgba(148, 163, 184, 0.3)'}`,
+                    borderRadius: '0.5rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontWeight: 600,
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <Clock size={16} />
+                  En espera
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyAction(candidateId, 'rejected', result)}
+                  style={{
+                    fontSize: '0.875rem',
+                    padding: '0.5rem 1rem',
+                    background: action?.status === 'rejected'
+                      ? 'rgba(239, 68, 68, 0.15)'
+                      : 'rgba(239, 68, 68, 0.08)',
+                    color: action?.status === 'rejected' ? '#dc2626' : '#ef4444',
+                    border: `1px solid ${action?.status === 'rejected' ? '#ef4444' : 'rgba(239, 68, 68, 0.3)'}`,
+                    borderRadius: '0.5rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontWeight: 600,
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <XCircle size={16} />
+                  Rechazar
+                </button>
+              </div>
 
               <div className="candidate-result__highlights">
                 <div>

@@ -73,3 +73,34 @@ export interface CreateUserResponse {
   role: string
   message: string
 }
+
+export interface CandidateActionRequest {
+  candidate_id: string
+  candidate_filename: string
+  action: 'interview' | 'rejected' | 'on_hold'
+  notes?: string
+}
+
+export interface CandidateActionResponse {
+  candidate_id: string
+  candidate_filename: string
+  action: string
+  username: string
+  timestamp: string
+  notes?: string
+  message: string
+}
+
+export interface AuditLogEntry {
+  candidate_id: string
+  candidate_filename: string
+  action: string
+  username: string
+  timestamp: string
+  notes?: string
+}
+
+export interface AuditLogResponse {
+  entries: AuditLogEntry[]
+  total: number
+}
