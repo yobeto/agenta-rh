@@ -13,8 +13,19 @@ WORKDIR /app
 COPY frontend ./
 COPY --from=deps /app/node_modules ./node_modules
 
+# Asegurar que las variables NEXT_PUBLIC_* estén disponibles durante el build
+# Render pasa estas variables automáticamente como variables de entorno
+# Las aceptamos como ARG y las convertimos en ENV para que Next.js las vea
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+
+# Hacer el script de build ejecutable
+RUN chmod +x ./build.sh
+
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build
+
+# Usar el script de build que verifica las variables
+RUN ./build.sh
 
 # Production image
 FROM node:20-alpine AS runner
