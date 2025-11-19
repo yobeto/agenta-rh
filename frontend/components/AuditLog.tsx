@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { getAuditLog } from '@/lib/api'
 import type { AuditLogEntry } from '@/types'
 import { FileText, User, Clock, CheckCircle, XCircle, Filter, X, RefreshCw } from 'lucide-react'
@@ -16,7 +16,7 @@ export function AuditLog() {
   }>({})
   const [showFilters, setShowFilters] = useState(false)
 
-  const loadAuditLog = async () => {
+  const loadAuditLog = useCallback(async () => {
     setIsLoading(true)
     setError(null)
     try {
@@ -33,11 +33,11 @@ export function AuditLog() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [filters])
 
   useEffect(() => {
     loadAuditLog()
-  }, [filters])
+  }, [loadAuditLog])
 
   const getActionLabel = (action: string): string => {
     switch (action) {

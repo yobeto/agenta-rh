@@ -10,7 +10,7 @@ interface Props {
   results: CandidateAnalysisResult[]
 }
 
-type CandidateStatus = 'pending' | 'interview' | 'rejected' | 'on_hold'
+type CandidateStatus = 'interview' | 'rejected' | 'on_hold'
 
 interface CandidateAction {
   candidateId: string
