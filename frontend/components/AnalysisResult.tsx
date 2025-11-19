@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import type { CandidateAnalysisResult } from '@/types'
+import type { CandidateAnalysisResult, Risk } from '@/types'
 import { AlertTriangle, CheckCircle2, ShieldCheck, Sparkles, Users, X, CheckCircle, Clock, XCircle } from 'lucide-react'
 import { registerCandidateAction } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
@@ -398,7 +398,7 @@ export function AnalysisResult({ results }: Props) {
             .slice(0, 3)
             .filter(criterion => criterion.value)
           // Procesar riesgos estructurados
-          const riskItems = [] as Array<{category: string, level: string, description: string}>
+          const riskItems: Array<{category: string, level: 'alto' | 'medio' | 'bajo', description: string}> = []
           const riskLabels: Record<string, string> = {
             'técnico': 'Técnico',
             'experiencia': 'Experiencia',
@@ -409,7 +409,7 @@ export function AnalysisResult({ results }: Props) {
           
           // Si hay riesgos estructurados, usarlos
           if (result.risks && Array.isArray(result.risks) && result.risks.length > 0) {
-            riskItems.push(...result.risks.map((r: any) => ({
+            riskItems.push(...result.risks.map((r: Risk) => ({
               category: riskLabels[r.category] || r.category || 'General',
               level: r.level || 'medio',
               description: r.description || 'Riesgo no especificado'

@@ -12,6 +12,12 @@ export interface CandidateDocumentPayload {
   candidateId?: string
 }
 
+export interface Risk {
+  category: string
+  level: 'alto' | 'medio' | 'bajo'
+  description: string
+}
+
 export interface CandidateAnalysisResult {
   candidateId?: string
   filename: string
@@ -21,6 +27,7 @@ export interface CandidateAnalysisResult {
   confidence_explanation: string
   missing_information?: string[] | null
   ethical_compliance?: boolean
+  risks?: Risk[] | null
 }
 
 export interface AnalyzeRequestPayload {
