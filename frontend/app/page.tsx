@@ -8,7 +8,7 @@ import { JobDescriptionInput } from '@/components/JobDescriptionInput'
 import { ChatPanel } from '@/components/ChatPanel'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { AdminMenu } from '@/components/AdminMenu'
-import { useAuth } from '@/contexts/AuthContext'
+import { UserBar } from '@/components/UserBar'
 import { analyzeCandidates } from '@/lib/api'
 import type {
   AnalyzeRequestPayload,
@@ -24,10 +24,6 @@ import {
   BarChart3,
   Sparkles,
   ArrowRight,
-  LogOut,
-  User,
-  Mail,
-  Shield,
 } from 'lucide-react'
 
 const MODEL_ID = 'gpt-4'
@@ -54,7 +50,6 @@ function computeScore(result: CandidateAnalysisResult): number {
 }
 
 export default function Home() {
-  const { user, logout } = useAuth()
   const [jobDescription, setJobDescription] = useState('')
   const [candidateDocuments, setCandidateDocuments] = useState<CandidateDocumentPayload[]>([])
   const [analysisResults, setAnalysisResults] = useState<CandidateAnalysisResult[]>([])
@@ -131,57 +126,14 @@ export default function Home() {
 
   const openChat = () => setIsChatOpen(true)
 
-  const displayName = useMemo(() => {
-    const raw = user?.username?.trim()
-    if (!raw) return 'Usuario'
-    if (raw.includes('@')) {
-      const [beforeAt] = raw.split('@')
-      return beforeAt || raw
-    }
-    return raw
-  }, [user?.username])
-
-  const displayInitial = displayName.charAt(0).toUpperCase()
-  const displayEmail = user?.email || (user?.username?.includes('@') ? user?.username : undefined)
-
   return (
     <ProtectedRoute>
       <main className="page-shell">
-        {/* Menú de administración (solo para admins) - Barra superior */}
-        <AdminMenu />
+        {/* Barra de información del usuario (siempre visible) */}
+        <UserBar />
         
-        {/* Header con información del usuario */}
-        <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center w-full justify-between md:justify-start gap-4 bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#003b71] to-[#0b5ca8] flex items-center justify-center text-white text-xl font-semibold shadow-inner">
-                {displayInitial}
-              </div>
-              <div className="flex flex-col">
-                <span className="text-base font-semibold text-slate-900 leading-tight">{displayName}</span>
-                {displayEmail && (
-                  <span className="text-xs text-slate-500 flex items-center gap-1">
-                    <Mail size={12} />
-                    {displayEmail}
-                  </span>
-                )}
-              </div>
-            </div>
-            {user?.role && (
-              <span className="inline-flex items-center gap-1 text-xs font-semibold bg-slate-100 text-slate-700 px-2.5 py-1 rounded-full border border-slate-200">
-                <Shield size={12} />
-                {user.role.toUpperCase()}
-              </span>
-            )}
-          </div>
-          <button
-            onClick={logout}
-            className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:border-slate-300 hover:text-slate-900 transition-all duration-200 shadow-sm hover:shadow-md self-start md:self-auto"
-          >
-            <LogOut className="w-4 h-4" />
-            <span>Cerrar sesión</span>
-          </button>
-        </div>
+        {/* Menú de administración (solo para admins) */}
+        <AdminMenu />
 
         <header className="hero" aria-labelledby="intro">
         <div className="hero__content">
@@ -196,7 +148,7 @@ export default function Home() {
             />
           </div>
           <h1 id="intro" className="hero__title">
-            Analiza talento con foco ético y precisión cuantitativa
+            Asistente GPT de RH para la pre-selección de candidatos
           </h1>
           <p className="hero__description">
             Carga la descripción del puesto y los CVs en PDF. Nuestro asistente genera comparativos objetivos,
@@ -278,8 +230,7 @@ export default function Home() {
             <div className="analysis-callout__info">
               <Sparkles size={18} aria-hidden="true" />
               <div>
-                <h2>Genera tu análisis inteligente</h2>
-                <p>La IA prioriza los criterios objetivos del JD contra cada CV en segundos.</p>
+                <h2>El asistente GPT de RH analiza la posición y los candidatos cargados</h2>
               </div>
             </div>
             <button

@@ -35,7 +35,7 @@ export function AdminMenu() {
 
   return (
     <>
-      {/* Barra de menú superior */}
+      {/* Barra de menú de administración */}
       <div style={{
         background: 'linear-gradient(135deg, var(--brand-primary, #003b71), var(--brand-accent, #0b5ca8))',
         padding: '0.75rem 2rem',
@@ -49,7 +49,7 @@ export function AdminMenu() {
           <Shield size={18} />
           <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Administración</span>
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem', flex: 1 }}>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
           {menuItems.map((item) => {
             const Icon = item.icon
             return (

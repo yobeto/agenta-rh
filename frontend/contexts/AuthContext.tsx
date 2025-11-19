@@ -57,10 +57,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (username: string, password: string) => {
     try {
       // Crear un AbortController para timeout
+      // Render puede poner servicios en "sleep" después de 15 min de inactividad
+      // La primera petición después del sleep puede tardar 30-90 segundos
       const controller = new AbortController()
       const timeoutId = setTimeout(() => {
         controller.abort()
-      }, 30000) // 30 segundos
+      }, 120000) // 120 segundos (2 minutos) para dar tiempo al backend de Render de despertar
       
       let response: Response
       try {
@@ -76,7 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (fetchError: any) {
         clearTimeout(timeoutId)
         if (fetchError.name === 'AbortError') {
-          throw new Error('La petición tardó demasiado. El servidor puede estar lento o no disponible.')
+          throw new Error('La petición tardó demasiado. El servidor puede estar iniciando (Render puede tardar hasta 2 minutos en despertar servicios inactivos). Por favor, intenta nuevamente.')
         }
         if (fetchError.message?.includes('Failed to fetch') || fetchError.message?.includes('NetworkError')) {
           throw new Error('No se pudo conectar con el servidor. Verifica que el backend esté funcionando.')
