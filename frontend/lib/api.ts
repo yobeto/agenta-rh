@@ -8,6 +8,8 @@ import type {
   CandidateActionRequest,
   CandidateActionResponse,
   AuditLogResponse,
+  Position,
+  PositionsResponse,
 } from '@/types'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -116,5 +118,20 @@ export async function getAuditLog(params?: {
 
 export async function getCandidateHistory(candidateId: string): Promise<AuditLogResponse> {
   const response = await apiClient.get<AuditLogResponse>(`/api/candidates/${candidateId}/history`)
+  return response.data
+}
+
+// Position functions
+export async function getPositions(params?: {
+  status?: string
+  department?: string
+  search?: string
+}): Promise<PositionsResponse> {
+  const response = await apiClient.get<PositionsResponse>('/api/positions', { params })
+  return response.data
+}
+
+export async function getPosition(positionId: string): Promise<Position> {
+  const response = await apiClient.get<Position>(`/api/positions/${positionId}`)
   return response.data
 }

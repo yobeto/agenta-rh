@@ -26,7 +26,7 @@ if len(SECRET_KEY) < 32 and os.getenv("ENVIRONMENT") == "production":
 
 # Dominio permitido
 ALLOWED_DOMAIN = "@inbursa.com"
-ALLOWED_DEPARTMENTS = ["RH", "Recursos Humanos", "Recursos Humanos y Talento", "Human Resources"]
+ALLOWED_DEPARTMENTS = ["RH"]
 
 # Base de datos de usuarios (en producción usar una BD real)
 # Formato: {username: {"password_hash": "...", "email": "...", "role": "...", "department": "..."}}
@@ -57,7 +57,7 @@ def validate_department(department: str) -> bool:
     """Valida que el departamento sea RH"""
     if not department or not isinstance(department, str):
         return False
-    return department.strip() in ALLOWED_DEPARTMENTS
+    return department.strip() == "RH"
 
 
 def validate_password_strength(password: str) -> tuple[bool, str]:

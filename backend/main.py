@@ -2,7 +2,7 @@
 agente-rh - API Principal
 Asistente de preselección de candidatos con principios éticos estrictos
 """
-from fastapi import FastAPI, HTTPException, UploadFile, File, Request
+from fastapi import FastAPI, HTTPException, UploadFile, File, Request, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from typing import Optional, List
@@ -533,6 +533,49 @@ async def get_position(
         raise HTTPException(
             status_code=500,
             detail="Error interno al obtener la posición"
+        )
+
+
+@app.post("/api/positions")
+async def create_position(
+    title: str = Form(...),
+    department: str = Form(...),
+    location: str = Form(...),
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """
+    Crea una nueva posición desde un PDF (solo admin)
+    """
+    try:
+        # Validar que sea PDF
+        if not file.filename or not file.filename.endswith('.pdf'):
+            raise HTTPException(
+                status_code=400,
+                detail="Solo se aceptan archivos PDF"
+            )
+        
+        # Leer el PDF
+        pdf_bytes = await file.read()
+        
+        # Crear la posición
+        position = position_service.create_position_from_pdf(
+            pdf_bytes=pdf_bytes,
+            filename=file.filename,
+            title=title,
+            department=department,
+            location=location,
+            created_by=current_user['username']
+        )
+        
+        return position
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creando posición: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Error interno al crear la posición"
         )
 
 

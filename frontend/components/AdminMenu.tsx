@@ -2,11 +2,12 @@
 
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import { UserPlus, FileText, X, Shield } from 'lucide-react'
+import { UserPlus, FileText, X, Shield, Briefcase } from 'lucide-react'
 import { CreateUserForm } from './CreateUserForm'
 import { AuditLog } from './AuditLog'
+import { CreatePositionForm } from './CreatePositionForm'
 
-type AdminView = 'none' | 'create-user' | 'audit-log'
+type AdminView = 'none' | 'create-user' | 'create-position' | 'audit-log'
 
 export function AdminMenu() {
   const { user } = useAuth()
@@ -21,6 +22,11 @@ export function AdminMenu() {
       id: 'create-user' as AdminView,
       label: 'Crear Usuario',
       icon: UserPlus,
+    },
+    {
+      id: 'create-position' as AdminView,
+      label: 'Crear Posición',
+      icon: Briefcase,
     },
     {
       id: 'audit-log' as AdminView,
@@ -104,7 +110,9 @@ export function AdminMenu() {
                 borderBottom: '1px solid rgba(148, 163, 184, 0.2)'
               }}>
                 <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: 'var(--brand-primary, #003b71)' }}>
-                  {activeView === 'create-user' ? 'Crear Usuario' : 'Bitácora de Acciones'}
+                  {activeView === 'create-user' ? 'Crear Usuario' : 
+                   activeView === 'create-position' ? 'Crear Posición' : 
+                   'Bitácora de Acciones'}
                 </h2>
                 <button
                   type="button"
@@ -134,6 +142,7 @@ export function AdminMenu() {
                 </button>
               </div>
               {activeView === 'create-user' && <CreateUserForm />}
+              {activeView === 'create-position' && <CreatePositionForm />}
               {activeView === 'audit-log' && <AuditLog />}
             </div>
           </div>

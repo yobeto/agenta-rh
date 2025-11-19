@@ -62,8 +62,8 @@ export function CreateUserForm() {
       return
     }
 
-    if (formData.department !== 'RH' && formData.department !== 'Recursos Humanos') {
-      setError('El departamento debe ser RH o Recursos Humanos')
+    if (formData.department !== 'RH') {
+      setError('El departamento debe ser RH')
       return
     }
 
@@ -94,57 +94,52 @@ export function CreateUserForm() {
 
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-      <div className="mb-8">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#003b71] to-[#0b5ca8] flex items-center justify-center text-white shadow-lg">
-            <UserPlus className="w-6 h-6" />
+      <div className="mb-4">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#003b71] to-[#0b5ca8] flex items-center justify-center text-white">
+            <UserPlus className="w-4 h-4" />
           </div>
-          <div>
-            <h2 className="text-2xl font-bold text-slate-900">
-              Crear nuevo usuario
-            </h2>
-            <p className="text-slate-600 text-sm mt-1">
-              Crea usuarios del departamento RH con email @inbursa.com
-            </p>
-          </div>
+          <h2 className="text-xl font-bold text-slate-900">
+            Crear nuevo usuario
+          </h2>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <div className="bg-red-50 border-l-4 border-red-500 text-red-700 px-5 py-4 rounded-lg flex items-start gap-3 shadow-sm">
-            <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+          <div className="bg-red-50 border-l-4 border-red-500 text-red-700 px-4 py-3 rounded-lg flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
-              <p className="font-semibold">Error al crear usuario</p>
-              <p className="text-sm mt-1">{error}</p>
+              <p className="font-semibold text-sm">Error al crear usuario</p>
+              <p className="text-xs mt-1">{error}</p>
             </div>
           </div>
         )}
 
         {success && (
-          <div className="bg-green-50 border-l-4 border-green-500 text-green-700 px-5 py-4 rounded-lg flex items-start gap-3 shadow-sm">
-            <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5" />
+          <div className="bg-green-50 border-l-4 border-green-500 text-green-700 px-4 py-3 rounded-lg flex items-start gap-2">
+            <CheckCircle2 className="w-4 h-4 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
-              <p className="font-semibold">Usuario creado exitosamente</p>
-              <p className="text-sm mt-1">{success}</p>
+              <p className="font-semibold text-sm">Usuario creado exitosamente</p>
+              <p className="text-xs mt-1">{success}</p>
             </div>
           </div>
         )}
 
         {/* Sección: Información básica */}
-        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-slate-900 mb-4 pb-3 border-b border-slate-200">
+        <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm">
+          <h3 className="text-base font-semibold text-slate-900 mb-3 pb-2 border-b border-slate-200">
             Información básica
           </h3>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label htmlFor="username" className="block text-sm font-semibold text-slate-700 mb-2">
+              <label htmlFor="username" className="block text-sm font-semibold text-slate-700 mb-1.5">
                 Nombre de usuario *
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <UserPlus className="h-5 w-5 text-slate-400" />
+                  <UserPlus className="h-4 w-4 text-slate-400" />
                 </div>
                 <input
                   id="username"
@@ -152,23 +147,23 @@ export function CreateUserForm() {
                   value={formData.username}
                   onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                   required
-                  className="w-full pl-11 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#003b71] focus:border-[#003b71] outline-none transition text-slate-900 placeholder-slate-400"
+                  className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#003b71] focus:border-[#003b71] outline-none transition text-slate-900 placeholder-slate-400 text-sm"
                   placeholder="usuario"
                   disabled={isLoading}
                   pattern="[a-zA-Z0-9_]{3,50}"
                   title="3-50 caracteres, solo letras, números y guiones bajos"
                 />
               </div>
-              <p className="text-xs text-slate-500 mt-1.5">3-50 caracteres, solo letras, números y guiones bajos</p>
+              <p className="text-xs text-slate-500 mt-1">3-50 caracteres, solo letras, números y guiones bajos</p>
             </div>
 
             <div>
-              <label htmlFor="email" className="block text-sm font-semibold text-slate-700 mb-2">
+              <label htmlFor="email" className="block text-sm font-semibold text-slate-700 mb-1.5">
                 Correo electrónico *
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-slate-400" />
+                  <Mail className="h-4 w-4 text-slate-400" />
                 </div>
                 <input
                   id="email"
@@ -176,30 +171,29 @@ export function CreateUserForm() {
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   required
-                  className="w-full pl-11 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#003b71] focus:border-[#003b71] outline-none transition text-slate-900 placeholder-slate-400"
+                  className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#003b71] focus:border-[#003b71] outline-none transition text-slate-900 placeholder-slate-400 text-sm"
                   placeholder="usuario@inbursa.com"
                   disabled={isLoading}
                 />
               </div>
-              <p className="text-xs text-slate-500 mt-1.5">Debe ser del dominio @inbursa.com</p>
             </div>
           </div>
         </div>
 
         {/* Sección: Contraseña */}
-        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-slate-900 mb-4 pb-3 border-b border-slate-200">
+        <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm">
+          <h3 className="text-base font-semibold text-slate-900 mb-3 pb-2 border-b border-slate-200">
             Seguridad
           </h3>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label htmlFor="password" className="block text-sm font-semibold text-slate-700 mb-2">
+              <label htmlFor="password" className="block text-sm font-semibold text-slate-700 mb-1.5">
                 Contraseña *
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-slate-400" />
+                  <Lock className="h-4 w-4 text-slate-400" />
                 </div>
                 <input
                   id="password"
@@ -207,7 +201,7 @@ export function CreateUserForm() {
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   required
-                  className={`w-full pl-11 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-[#003b71] outline-none transition text-slate-900 placeholder-slate-400 ${
+                  className={`w-full pl-10 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-[#003b71] outline-none transition text-slate-900 placeholder-slate-400 text-sm ${
                     formData.password.length > 0
                       ? isPasswordValid
                         ? 'border-green-300 focus:border-green-500'
@@ -224,11 +218,11 @@ export function CreateUserForm() {
                   className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition"
                   tabIndex={-1}
                 >
-                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
               {formData.password.length > 0 && (
-                <div className="mt-3 space-y-2">
+                <div className="mt-2 space-y-1.5">
                   {Object.entries({
                     minLength: 'Mínimo 8 caracteres',
                     hasUpperCase: 'Una letra mayúscula',
@@ -255,12 +249,12 @@ export function CreateUserForm() {
             </div>
 
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-semibold text-slate-700 mb-2">
+              <label htmlFor="confirmPassword" className="block text-sm font-semibold text-slate-700 mb-1.5">
                 Confirmar contraseña *
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-slate-400" />
+                  <Lock className="h-4 w-4 text-slate-400" />
                 </div>
                 <input
                   id="confirmPassword"
@@ -268,7 +262,7 @@ export function CreateUserForm() {
                   value={formData.confirmPassword}
                   onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                   required
-                  className={`w-full pl-11 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-[#003b71] outline-none transition text-slate-900 placeholder-slate-400 ${
+                  className={`w-full pl-10 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-[#003b71] outline-none transition text-slate-900 placeholder-slate-400 text-sm ${
                     formData.confirmPassword.length > 0
                       ? passwordsMatch
                         ? 'border-green-300 focus:border-green-500'
@@ -284,11 +278,11 @@ export function CreateUserForm() {
                   className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition"
                   tabIndex={-1}
                 >
-                  {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
               {formData.confirmPassword.length > 0 && (
-                <div className="mt-3">
+                <div className="mt-2">
                   {passwordsMatch ? (
                     <div className="flex items-center gap-2 text-xs text-green-700">
                       <Check className="h-4 w-4" />
@@ -307,48 +301,47 @@ export function CreateUserForm() {
         </div>
 
         {/* Sección: Configuración */}
-        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-slate-900 mb-4 pb-3 border-b border-slate-200">
+        <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm">
+          <h3 className="text-base font-semibold text-slate-900 mb-3 pb-2 border-b border-slate-200">
             Configuración
           </h3>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label htmlFor="department" className="block text-sm font-semibold text-slate-700 mb-2">
+              <label htmlFor="department" className="block text-sm font-semibold text-slate-700 mb-1.5">
                 Departamento *
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Building2 className="h-5 w-5 text-slate-400" />
+                  <Building2 className="h-4 w-4 text-slate-400" />
                 </div>
                 <select
                   id="department"
                   value={formData.department}
                   onChange={(e) => setFormData({ ...formData, department: e.target.value })}
                   required
-                  className="w-full pl-11 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#003b71] focus:border-[#003b71] outline-none transition bg-white text-slate-900"
+                  className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#003b71] focus:border-[#003b71] outline-none transition bg-white text-slate-900 text-sm"
                   disabled={isLoading}
                 >
                   <option value="RH">RH</option>
-                  <option value="Recursos Humanos">Recursos Humanos</option>
                 </select>
               </div>
             </div>
 
             <div>
-              <label htmlFor="role" className="block text-sm font-semibold text-slate-700 mb-2">
+              <label htmlFor="role" className="block text-sm font-semibold text-slate-700 mb-1.5">
                 Rol *
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Shield className="h-5 w-5 text-slate-400" />
+                  <Shield className="h-4 w-4 text-slate-400" />
                 </div>
                 <select
                   id="role"
                   value={formData.role}
                   onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                   required
-                  className="w-full pl-11 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#003b71] focus:border-[#003b71] outline-none transition bg-white text-slate-900"
+                  className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#003b71] focus:border-[#003b71] outline-none transition bg-white text-slate-900 text-sm"
                   disabled={isLoading}
                 >
                   <option value="user">Usuario</option>
@@ -360,11 +353,11 @@ export function CreateUserForm() {
         </div>
 
         {/* Botón de acción */}
-        <div className="flex items-center justify-end gap-4 pt-2">
+        <div className="flex items-center justify-end gap-4 pt-1">
           <button
             type="submit"
             disabled={isLoading || !isPasswordValid || !passwordsMatch}
-            className="px-8 py-3 bg-gradient-to-r from-[#003b71] to-[#0b5ca8] text-white rounded-lg font-semibold hover:from-[#002d56] hover:to-[#0a4a87] focus:outline-none focus:ring-2 focus:ring-[#003b71] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
+            className="px-6 py-2.5 bg-gradient-to-r from-[#003b71] to-[#0b5ca8] text-white rounded-lg font-semibold hover:from-[#002d56] hover:to-[#0a4a87] focus:outline-none focus:ring-2 focus:ring-[#003b71] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl text-sm"
           >
             {isLoading ? (
               <>

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
 import { CandidateForm } from '@/components/CandidateForm'
 import { AnalysisResult } from '@/components/AnalysisResult'
-import { JobDescriptionInput } from '@/components/JobDescriptionInput'
+import { PositionSelector } from '@/components/PositionSelector'
 import { ChatPanel } from '@/components/ChatPanel'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { AdminMenu } from '@/components/AdminMenu'
@@ -207,7 +207,7 @@ export default function Home() {
       <section className="workspace">
         <div className="workspace__primary">
           <div className="intake-grid">
-            <JobDescriptionInput
+            <PositionSelector
               jobDescription={jobDescription}
               onJobDescriptionChange={value => {
                 setJobDescription(value)

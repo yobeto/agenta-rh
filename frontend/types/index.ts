@@ -52,28 +52,48 @@ export interface ChatResponsePayload {
 }
 
 export interface ChatMessageItem {
-  id: string
   type: 'user' | 'assistant'
   message: string
-  timestamp: string
+  timestamp?: string
 }
 
-export interface CreateUserRequest {
-  username: string
-  password: string
-  email: string
+// Position types
+export interface Position {
+  id: string
+  code: string
+  title: string
   department: string
-  role?: string
+  location: string
+  status: 'active' | 'closed' | 'draft'
+  created_at: string
+  created_by: string
+  updated_at: string
+  updated_by: string
+  job_description: {
+    raw_text: string
+    pdf_path?: string
+    word_count: number
+    extracted_at: string
+  }
+  metadata: {
+    salary_range?: string
+    experience_required?: string
+    education_level?: string
+    employment_type?: string
+  }
+  statistics: {
+    times_used: number
+    candidates_analyzed: number
+    last_used: string | null
+  }
 }
 
-export interface CreateUserResponse {
-  username: string
-  email: string
-  department: string
-  role: string
-  message: string
+export interface PositionsResponse {
+  positions: Position[]
+  total: number
 }
 
+// Candidate Actions
 export interface CandidateActionRequest {
   candidate_id: string
   candidate_filename: string
@@ -88,9 +108,9 @@ export interface CandidateActionResponse {
   username: string
   timestamp: string
   notes?: string
-  message: string
 }
 
+// Audit Log
 export interface AuditLogEntry {
   candidate_id: string
   candidate_filename: string
