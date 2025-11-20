@@ -213,6 +213,8 @@ class CandidateActionRequest(BaseModel):
     candidate_filename: str = Field(..., description="Nombre del archivo del candidato")
     action: str = Field(..., description="Acción: 'interview', 'rejected', 'on_hold'")
     reason: Optional[str] = Field(default=None, description="Razón de la acción (obligatorio para 'rejected', opcional para otros)")
+    position_id: Optional[str] = Field(default=None, description="ID de la posición/Job Description")
+    position_title: Optional[str] = Field(default=None, description="Título de la posición/Job Description")
 
 
 class CandidateActionResponse(BaseModel):
@@ -223,6 +225,8 @@ class CandidateActionResponse(BaseModel):
     username: str
     timestamp: str
     reason: Optional[str] = None
+    position_id: Optional[str] = None
+    position_title: Optional[str] = None
     message: str = "Acción registrada exitosamente"
 
 
@@ -234,6 +238,8 @@ class AuditLogEntry(BaseModel):
     username: str
     timestamp: str
     reason: Optional[str] = None
+    position_id: Optional[str] = None
+    position_title: Optional[str] = None
 
 
 class AuditLogResponse(BaseModel):

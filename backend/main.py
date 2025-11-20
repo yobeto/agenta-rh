@@ -447,7 +447,9 @@ async def register_candidate_action(
             candidate_filename=action_request.candidate_filename,
             action=action_request.action,
             username=current_user['username'],
-            reason=action_request.reason
+            reason=action_request.reason,
+            position_id=action_request.position_id,
+            position_title=action_request.position_title
         )
         
         return CandidateActionResponse(
@@ -457,6 +459,8 @@ async def register_candidate_action(
             username=action_record.username,
             timestamp=action_record.timestamp,
             reason=action_record.reason,
+            position_id=action_record.position_id,
+            position_title=action_record.position_title,
             message="Acción registrada exitosamente"
         )
     except HTTPException:

@@ -27,6 +27,8 @@ class CandidateAction:
     username: str
     timestamp: str
     reason: Optional[str] = None
+    position_id: Optional[str] = None
+    position_title: Optional[str] = None
 
 
 def load_audit_log():
@@ -56,7 +58,9 @@ def log_candidate_action(
     candidate_filename: str,
     action: str,
     username: str,
-    reason: Optional[str] = None
+    reason: Optional[str] = None,
+    position_id: Optional[str] = None,
+    position_title: Optional[str] = None
 ) -> CandidateAction:
     """
     Registra una acción sobre un candidato
@@ -69,7 +73,9 @@ def log_candidate_action(
         action=action,
         username=username,
         timestamp=timestamp,
-        reason=reason
+        reason=reason,
+        position_id=position_id,
+        position_title=position_title
     )
     
     AUDIT_LOG.append(asdict(action_record))

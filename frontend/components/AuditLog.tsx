@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { getAuditLog } from '@/lib/api'
 import type { AuditLogEntry } from '@/types'
-import { FileText, User, Clock, CheckCircle, XCircle, Filter, X, RefreshCw } from 'lucide-react'
+import { FileText, User, Clock, CheckCircle, XCircle, Filter, X, RefreshCw, Building2 } from 'lucide-react'
 
 export function AuditLog() {
   const [entries, setEntries] = useState<AuditLogEntry[]>([])
@@ -250,11 +250,17 @@ export function AuditLog() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '0.5rem' }}>
                   <div>
                     <strong style={{ fontSize: '0.95rem' }}>{getActionLabel(entry.action)}</strong>
-                    <div style={{ display: 'flex', gap: '1rem', marginTop: '0.25rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                    <div style={{ display: 'flex', gap: '1rem', marginTop: '0.25rem', fontSize: '0.875rem', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                         <FileText size={14} />
                         {entry.candidate_filename}
                       </span>
+                      {entry.position_title && (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: 600, color: '#003b71' }}>
+                          <Building2 size={14} />
+                          {entry.position_title}
+                        </span>
+                      )}
                       <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                         <User size={14} />
                         {entry.username}

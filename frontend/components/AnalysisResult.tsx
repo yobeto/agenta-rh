@@ -9,6 +9,9 @@ import { ActionReasonModal } from './ActionReasonModal'
 
 interface Props {
   results: CandidateAnalysisResult[]
+  selectedPositionId?: string
+  selectedPositionTitle?: string
+  onDecisionsSubmitted?: () => void
 }
 
 type CandidateStatus = 'interview' | 'rejected' | 'on_hold'
@@ -67,7 +70,7 @@ function getScoreTone(score: number): 'alto' | 'medio' | 'bajo' {
   return 'bajo'
 }
 
-export function AnalysisResult({ results }: Props) {
+export function AnalysisResult({ results, selectedPositionId, selectedPositionTitle, onDecisionsSubmitted }: Props) {
   const { user } = useAuth()
   const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({})
   const [selectedCandidates, setSelectedCandidates] = useState<Set<string>>(new Set())
@@ -261,7 +264,9 @@ export function AnalysisResult({ results }: Props) {
             candidate_id: pendingAction.candidateId,
             candidate_filename: pendingAction.candidateFilename,
             action: pendingAction.status,
-            reason: pendingAction.reason || undefined
+            reason: pendingAction.reason || undefined,
+            position_id: selectedPositionId,
+            position_title: selectedPositionTitle
           })
           successful.push(pendingAction.candidateId)
         } catch (error) {
@@ -285,6 +290,11 @@ export function AnalysisResult({ results }: Props) {
         
         // Mostrar mensaje de éxito
         alert(`Se registraron exitosamente ${successful.length} decisión${successful.length > 1 ? 'es' : ''} en la bitácora.`)
+        
+        // Limpiar JD y CVs (llamar callback del componente padre)
+        if (onDecisionsSubmitted) {
+          onDecisionsSubmitted()
+        }
       }
     } catch (error) {
       console.error('Error enviando decisiones:', error)
@@ -955,20 +965,78 @@ export function AnalysisResult({ results }: Props) {
                       {riskItems.map((item, index) => {
                         // Normalizar la descripción del riesgo para que indique claramente lo que falta
                         let normalizedDescription = item.description
-                        const lowerDesc = normalizedDescription.toLowerCase()
+                        const lowerDesc = normalizedDescription.toLowerCase().trim()
                         
-                        // Si la descripción no indica claramente que algo falta, agregarlo
-                        if (!lowerDesc.startsWith('no se menciona') && 
-                            !lowerDesc.startsWith('faltan') && 
-                            !lowerDesc.startsWith('falta') &&
-                            !lowerDesc.startsWith('ausencia') &&
-                            !lowerDesc.startsWith('no se encontró') &&
-                            !lowerDesc.startsWith('no se encontraron') &&
-                            !lowerDesc.includes('no coincide') &&
-                            !lowerDesc.includes('no está') &&
-                            !lowerDesc.includes('no cumple')) {
-                          // Si parece ser un requisito específico, agregar "No se menciona"
-                          normalizedDescription = `No se menciona ${normalizedDescription.toLowerCase()}`
+                        // Verificar si ya indica claramente que algo falta o es un problema
+                        const alreadyIndicatesMissing = 
+                          lowerDesc.startsWith('no se menciona') || 
+                          lowerDesc.startsWith('faltan') || 
+                          lowerDesc.startsWith('falta ') ||
+                          lowerDesc.startsWith('ausencia') ||
+                          lowerDesc.startsWith('ausencia de') ||
+                          lowerDesc.startsWith('no se encontró') ||
+                          lowerDesc.startsWith('no se encontraron') ||
+                          lowerDesc.startsWith('no tiene') ||
+                          lowerDesc.startsWith('carece de') ||
+                          lowerDesc.startsWith('sin ') ||
+                          lowerDesc.startsWith('el área funcional') ||
+                          lowerDesc.startsWith('requiere revisión') ||
+                          lowerDesc.includes('no coincide') ||
+                          lowerDesc.includes('no está') ||
+                          lowerDesc.includes('no cumple') ||
+                          lowerDesc.includes('diferente y no transferible') ||
+                          lowerDesc.includes('insuficiente') ||
+                          lowerDesc.includes('por debajo') ||
+                          lowerDesc.includes('bajo nivel') ||
+                          lowerDesc.includes('afecta el desempeño') ||
+                          lowerDesc.includes('podría afectar') ||
+                          lowerDesc.includes('lo que indica')
+                        
+                        // Si no indica claramente que algo falta, agregar prefijo apropiado según el contexto
+                        if (!alreadyIndicatesMissing) {
+                          // Detectar el tipo de descripción para usar el prefijo correcto
+                          const isSpecificRequirement = 
+                            lowerDesc.includes('experiencia') ||
+                            lowerDesc.includes('certificación') ||
+                            lowerDesc.includes('título') ||
+                            lowerDesc.includes('habilidad') ||
+                            lowerDesc.includes('conocimiento') ||
+                            lowerDesc.includes('formación') ||
+                            lowerDesc.includes('solución') ||
+                            lowerDesc.includes('tecnología') ||
+                            lowerDesc.includes('herramienta') ||
+                            lowerDesc.includes('lenguaje') ||
+                            lowerDesc.includes('metodología') ||
+                            lowerDesc.includes('implementando') ||
+                            lowerDesc.includes('diseño de') ||
+                            lowerDesc.includes('modelo de datos')
+                          
+                          const isGeneralDescription = 
+                            lowerDesc.includes('requisito') ||
+                            lowerDesc.includes('criterio') ||
+                            lowerDesc.includes('área funcional') ||
+                            lowerDesc.includes('nivel de') ||
+                            lowerDesc.includes('cumplimiento')
+                          
+                          const isActionDescription =
+                            lowerDesc.includes('afecta') ||
+                            lowerDesc.includes('indica') ||
+                            lowerDesc.includes('podría')
+                          
+                          if (isSpecificRequirement) {
+                            // Para requisitos específicos (experiencia, certificación, etc.), usar "No se menciona"
+                            normalizedDescription = `No se menciona ${normalizedDescription.toLowerCase()}`
+                          } else if (isGeneralDescription) {
+                            // Para descripciones generales (requisitos, criterios), usar "Falta"
+                            normalizedDescription = `Falta ${normalizedDescription.toLowerCase()}`
+                          } else if (isActionDescription) {
+                            // Para descripciones de impacto, no agregar prefijo (ya está bien formulado)
+                            // Mantener la descripción original
+                            normalizedDescription = item.description
+                          } else {
+                            // Para otros casos, usar "Ausencia de"
+                            normalizedDescription = `Ausencia de ${normalizedDescription.toLowerCase()}`
+                          }
                         }
                         
                         const levelColors: Record<string, {bg: string, text: string, border: string}> = {

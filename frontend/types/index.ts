@@ -107,6 +107,8 @@ export interface CandidateActionRequest {
   candidate_filename: string
   action: 'interview' | 'rejected' | 'on_hold'
   reason?: string
+  position_id?: string
+  position_title?: string
 }
 
 export interface CandidateActionResponse {
@@ -116,6 +118,8 @@ export interface CandidateActionResponse {
   username: string
   timestamp: string
   reason?: string
+  position_id?: string
+  position_title?: string
 }
 
 // Audit Log
@@ -126,6 +130,8 @@ export interface AuditLogEntry {
   username: string
   timestamp: string
   reason?: string
+  position_id?: string
+  position_title?: string
 }
 
 export interface AuditLogResponse {

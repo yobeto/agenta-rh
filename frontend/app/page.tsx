@@ -51,6 +51,8 @@ function computeScore(result: CandidateAnalysisResult): number {
 
 export default function Home() {
   const [jobDescription, setJobDescription] = useState('')
+  const [selectedPositionId, setSelectedPositionId] = useState<string | null>(null)
+  const [selectedPositionTitle, setSelectedPositionTitle] = useState<string | null>(null)
   const [candidateDocuments, setCandidateDocuments] = useState<CandidateDocumentPayload[]>([])
   const [analysisResults, setAnalysisResults] = useState<CandidateAnalysisResult[]>([])
   const [analysisError, setAnalysisError] = useState<string | null>(null)
@@ -213,6 +215,10 @@ export default function Home() {
                 setJobDescription(value)
                 setAnalysisResults([])
               }}
+              onPositionSelect={(position) => {
+                setSelectedPositionId(position.id)
+                setSelectedPositionTitle(position.title)
+              }}
             />
 
             <CandidateForm
@@ -294,7 +300,20 @@ export default function Home() {
             </section>
           )}
 
-          <AnalysisResult results={analysisResults} />
+          <AnalysisResult 
+            results={analysisResults} 
+            selectedPositionId={selectedPositionId || undefined}
+            selectedPositionTitle={selectedPositionTitle || undefined}
+            onDecisionsSubmitted={() => {
+              // Limpiar JD, posición, CVs y resultados después de enviar decisiones
+              setJobDescription('')
+              setSelectedPositionId(null)
+              setSelectedPositionTitle(null)
+              setCandidateDocuments([])
+              setAnalysisResults([])
+              setAnalysisError(null)
+            }}
+          />
         </div>
       </section>
 

@@ -25,6 +25,13 @@ export function PositionSelector({ jobDescription, onJobDescriptionChange, onPos
     loadPositions()
   }, [])
 
+  // Resetear posición seleccionada cuando el JD se limpia
+  useEffect(() => {
+    if (!jobDescription || jobDescription.trim() === '') {
+      setSelectedPosition(null)
+    }
+  }, [jobDescription])
+
   const loadPositions = async () => {
     setIsLoading(true)
     setError(null)
