@@ -706,10 +706,16 @@ IMPORTANTE:
         # Si encontramos un candidato a JSON, intentar parsearlo
         if json_str:
             try:
-                data = json.loads(json_str)
+                # Limpiar el JSON string de posibles caracteres problemáticos
+                json_str_clean = json_str.strip()
+                # Remover posibles saltos de línea al inicio que puedan causar problemas
+                while json_str_clean.startswith('\n') or json_str_clean.startswith('\r'):
+                    json_str_clean = json_str_clean[1:].strip()
+                
+                data = json.loads(json_str_clean)
             except json.JSONDecodeError as e:
                 logger.warning(f"Error parseando JSON (estrategia 1): {str(e)}")
-                logger.debug(f"JSON intentado: {json_str[:500]}...")
+                logger.debug(f"JSON intentado (primeros 500 chars): {json_str[:500]}...")
                 
                 # Estrategia 3: Intentar encontrar JSON válido buscando desde el inicio
                 # Buscar el primer { y luego encontrar el } correspondiente balanceado
@@ -727,20 +733,48 @@ IMPORTANTE:
                                 break
                     
                     if brace_count == 0:
-                        json_str = cleaned_response[start_idx:end_idx]
+                        json_str = cleaned_response[start_idx:end_idx].strip()
+                        # Limpiar nuevamente
+                        while json_str.startswith('\n') or json_str.startswith('\r'):
+                            json_str = json_str[1:].strip()
                         try:
                             data = json.loads(json_str)
                         except json.JSONDecodeError as e2:
                             logger.warning(f"Error parseando JSON (estrategia 2): {str(e2)}")
+                            logger.debug(f"JSON intentado (primeros 500 chars): {json_str[:500]}...")
                             logger.debug(f"Respuesta completa (primeros 1000 chars): {raw_response[:1000]}")
+                    else:
+                        logger.warning(f"JSON no balanceado: {brace_count} llaves abiertas sin cerrar")
         
         # Si logramos parsear el JSON, procesarlo
         if data:
             try:
+                # Validar que data sea un diccionario
+                if not isinstance(data, dict):
+                    logger.error(
+                        f"El JSON parseado no es un diccionario para candidato {candidate_id or filename}. "
+                        f"Tipo: {type(data)}, Valor: {str(data)[:200]}"
+                    )
+                    raise ValueError(f"El JSON parseado no es un diccionario, es {type(data)}")
+                
+                # Validar que tenga al menos algunos campos esperados
+                if not any(key in data for key in ["recommendation", "objective_criteria", "confidence_level"]):
+                    logger.warning(
+                        f"El JSON parseado no tiene los campos esperados para candidato {candidate_id or filename}. "
+                        f"Campos encontrados: {list(data.keys()) if isinstance(data, dict) else 'N/A'}"
+                    )
                 
                 # Convertir criterios
                 criteria = []
-                for crit in data.get("objective_criteria", []):
+                objective_criteria_data = data.get("objective_criteria", [])
+                if not isinstance(objective_criteria_data, list):
+                    logger.warning(f"objective_criteria no es una lista, es {type(objective_criteria_data)}")
+                    objective_criteria_data = []
+                
+                for crit in objective_criteria_data:
+                    if not isinstance(crit, dict):
+                        logger.warning(f"Criterio no es un diccionario: {type(crit)}")
+                        continue
                     criteria.append(ObjectiveCriterion(
                         name=crit.get("name", ""),
                         value=crit.get("value", ""),
@@ -760,6 +794,9 @@ IMPORTANTE:
                 
                 # VALIDACIÓN POST-ANÁLISIS: Ajustar nivel si hay inconsistencias
                 missing_info = data.get("missing_information", [])
+                if not isinstance(missing_info, list):
+                    logger.warning(f"missing_information no es una lista, es {type(missing_info)}")
+                    missing_info = []
                 missing_count = len(missing_info) if missing_info else 0
                 
                 # Si el nivel es "high" pero hay más de 2 requisitos faltantes, ajustar
@@ -799,6 +836,9 @@ IMPORTANTE:
                 
                 # Extraer riesgos identificados
                 risks_data = data.get("risks", [])
+                if not isinstance(risks_data, list):
+                    logger.warning(f"risks no es una lista, es {type(risks_data)}")
+                    risks_data = []
                 risks = []
                 if risks_data:
                     for risk in risks_data:
@@ -825,7 +865,10 @@ IMPORTANTE:
                         })
                 
                 # Si el área funcional es diferente, agregar riesgo
-                confidence_explanation_lower = data.get("confidence_explanation", "").lower()
+                confidence_explanation = data.get("confidence_explanation", "")
+                if not isinstance(confidence_explanation, str):
+                    confidence_explanation = str(confidence_explanation) if confidence_explanation else ""
+                confidence_explanation_lower = confidence_explanation.lower()
                 if "área funcional" in confidence_explanation_lower and ("diferente" in confidence_explanation_lower or "no transferible" in confidence_explanation_lower):
                     risks.append({
                         "category": "área_funcional",
@@ -833,20 +876,35 @@ IMPORTANTE:
                         "description": "El área funcional del CV no coincide con el JD y no es transferible"
                     })
                 
+                # Obtener recommendation de forma segura
+                recommendation = data.get("recommendation", "Análisis no disponible")
+                if not isinstance(recommendation, str):
+                    recommendation = str(recommendation) if recommendation else "Análisis no disponible"
+                
+                # Obtener confidence_explanation de forma segura
+                confidence_explanation_final = data.get("confidence_explanation", "")
+                if not isinstance(confidence_explanation_final, str):
+                    confidence_explanation_final = str(confidence_explanation_final) if confidence_explanation_final else ""
+                
                 return CandidateAnalysisResult(
                     candidateId=candidate_id,
                     filename=filename,
-                    recommendation=data.get("recommendation", "Análisis no disponible"),
+                    recommendation=recommendation,
                     objective_criteria=criteria,
                     confidence_level=confidence,
-                    confidence_explanation=data.get("confidence_explanation", ""),
+                    confidence_explanation=confidence_explanation_final,
                     missing_information=missing_info,
                     ethical_compliance=True,
                     risks=risks if risks else None
                 )
             except Exception as e:
-                logger.error(f"Error procesando datos parseados para {candidate_id or filename}: {str(e)}")
-                logger.debug(f"Datos parseados: {data}")
+                error_type = type(e).__name__
+                error_msg = str(e)
+                logger.error(
+                    f"Error procesando datos parseados para {candidate_id or filename}: {error_type} - {error_msg}"
+                )
+                logger.error(f"Tipo de datos: {type(data)}, Contenido: {str(data)[:500] if data else 'None'}")
+                logger.debug(f"Traceback completo:", exc_info=True)
                 # Continuar al fallback
         
         # Fallback: respuesta básica cuando no se puede parsear
