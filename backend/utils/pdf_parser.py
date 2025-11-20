@@ -1,40 +1,50 @@
 """
 Utility functions to extract text from PDF files securely
+SIN RESTRICCIONES DE TAMAÑO para Job Descriptions y CVs
 """
 from typing import Tuple
 from io import BytesIO
 import PyPDF2
+import logging
 
-MAX_PAGES = 20  # avoid excessive processing
-MAX_TEXT_LENGTH = 10000  # limit text length to prevent overload
+logger = logging.getLogger(__name__)
 
 def extract_text_from_pdf(file_bytes: bytes) -> Tuple[str, list[str]]:
-    """Extract text from a PDF file (bytes) and return text plus warnings."""
+    """
+    Extrae texto de un archivo PDF (bytes) y retorna texto más advertencias.
+    SIN RESTRICCIONES DE TAMAÑO: Extrae todo el texto del PDF sin límites.
+    """
     warnings: list[str] = []
-    reader = PyPDF2.PdfReader(BytesIO(file_bytes))
-    num_pages = len(reader.pages)
+    
+    try:
+        reader = PyPDF2.PdfReader(BytesIO(file_bytes))
+        num_pages = len(reader.pages)
+        
+        logger.info(f"Extrayendo texto de PDF con {num_pages} páginas (sin restricciones de tamaño)")
+        
+        extracted_text_parts: list[str] = []
+        for page_index in range(num_pages):
+            try:
+                page = reader.pages[page_index]
+                page_text = page.extract_text() or ""
+                extracted_text_parts.append(page_text)
+            except Exception as e:
+                logger.warning(f"Error extrayendo texto de la página {page_index + 1}: {str(e)}")
+                warnings.append(f"Error en página {page_index + 1}: {str(e)}")
+                continue
 
-    if num_pages > MAX_PAGES:
-        warnings.append(f"El PDF tiene {num_pages} páginas. Se analizaron solo las primeras {MAX_PAGES}.")
-        num_pages = MAX_PAGES
+        combined_text = "\n".join(extracted_text_parts)
+        
+        logger.info(f"Texto extraído: {len(combined_text)} caracteres de {num_pages} páginas")
 
-    extracted_text_parts: list[str] = []
-    for page_index in range(num_pages):
-        page = reader.pages[page_index]
-        page_text = page.extract_text() or ""
-        extracted_text_parts.append(page_text)
-
-    combined_text = "\n".join(extracted_text_parts)
-
-    if len(combined_text) > MAX_TEXT_LENGTH:
-        warnings.append(
-            "El texto extraído supera el límite. Se ha truncado para mantener la confidencialidad y el desempeño."
+        # Normalizar espacios (mantener estructura pero limpiar espacios excesivos)
+        combined_text = "\n".join(
+            line.strip() for line in combined_text.splitlines() if line.strip()
         )
-        combined_text = combined_text[:MAX_TEXT_LENGTH]
 
-    # Normalizar espacios
-    combined_text = "\n".join(
-        line.strip() for line in combined_text.splitlines() if line.strip()
-    )
-
-    return combined_text, warnings
+        return combined_text, warnings
+        
+    except Exception as e:
+        logger.error(f"Error extrayendo texto del PDF: {str(e)}")
+        warnings.append(f"Error general al procesar PDF: {str(e)}")
+        return "", warnings

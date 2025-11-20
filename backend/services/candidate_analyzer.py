@@ -226,7 +226,7 @@ class CandidateAnalyzer:
             end_part = text[-end_chars:]
         
         return f"{start_part}\n\n[... contenido truncado para cumplir límite de tokens ...]\n\n{end_part}"
-    
+
     def _build_ethical_prompt(
         self,
         job_description: str,
@@ -798,8 +798,58 @@ IMPORTANTE:
                                 data = self._normalize_dict_keys(data)
                         except json.JSONDecodeError as e2:
                             logger.warning(f"Error parseando JSON (estrategia 2): {str(e2)}")
-                            logger.debug(f"JSON intentado (primeros 500 chars): {json_str[:500]}...")
-                            logger.debug(f"Respuesta completa (primeros 1000 chars): {raw_response[:1000]}")
+                            logger.warning(f"JSON intentado (primeros 1000 chars): {json_str[:1000]}...")
+                            logger.warning(f"JSON intentado (últimos 500 chars): {json_str[-500:] if len(json_str) > 500 else json_str}")
+                            logger.warning(f"Posición del error: {e2.pos if hasattr(e2, 'pos') else 'N/A'}")
+                            
+                            # Estrategia 4: Intentar reparar JSON común malformado
+                            try:
+                                json_str_fixed = json_str
+                                
+                                # Reparación 1: Remover trailing commas antes de } o ]
+                                json_str_fixed = re.sub(r',\s*}', '}', json_str_fixed)
+                                json_str_fixed = re.sub(r',\s*]', ']', json_str_fixed)
+                                
+                                # Reparación 2: Remover comentarios de línea (// comentario)
+                                json_str_fixed = re.sub(r'//.*?$', '', json_str_fixed, flags=re.MULTILINE)
+                                
+                                # Reparación 3: Remover comentarios de bloque (/* comentario */)
+                                json_str_fixed = re.sub(r'/\*.*?\*/', '', json_str_fixed, flags=re.DOTALL)
+                                
+                                # Reparación 4: Escapar caracteres de control no válidos
+                                json_str_fixed = json_str_fixed.replace('\x00', '').replace('\x01', '').replace('\x02', '')
+                                
+                                # Reparación 5: Arreglar comillas simples que deberían ser dobles en keys
+                                json_str_fixed = re.sub(r"'(\w+)'\s*:", r'"\1":', json_str_fixed)
+                                
+                                # Reparación 6: Arreglar strings con comillas simples que deberían ser dobles
+                                json_str_fixed = re.sub(r":\s*'([^']*)'", r': "\1"', json_str_fixed)
+                                
+                                # Reparación 7: Remover saltos de línea dentro de strings (mantener solo espacios)
+                                # Esto es complejo, mejor intentar parsear primero
+                                
+                                data = json.loads(json_str_fixed)
+                                if isinstance(data, dict):
+                                    data = self._normalize_dict_keys(data)
+                                    logger.info("JSON reparado exitosamente usando estrategia 4")
+                            except Exception as e3:
+                                logger.warning(f"Error reparando JSON (estrategia 4): {str(e3)}")
+                                
+                                # Estrategia 5: Intentar extraer JSON de texto mixto (texto + JSON)
+                                try:
+                                    # Buscar el bloque JSON más grande posible
+                                    # Encontrar todos los bloques { ... } y tomar el más grande
+                                    json_blocks = re.findall(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', cleaned_response, re.DOTALL)
+                                    if json_blocks:
+                                        # Ordenar por tamaño y tomar el más grande
+                                        largest_block = max(json_blocks, key=len)
+                                        data = json.loads(largest_block)
+                                        if isinstance(data, dict):
+                                            data = self._normalize_dict_keys(data)
+                                            logger.info("JSON extraído exitosamente usando estrategia 5 (bloque más grande)")
+                                except Exception as e4:
+                                    logger.warning(f"Error en estrategia 5: {str(e4)}")
+                                    logger.debug(f"Respuesta completa (primeros 2000 chars): {raw_response[:2000]}")
                     else:
                         logger.warning(f"JSON no balanceado: {brace_count} llaves abiertas sin cerrar")
         
@@ -1033,10 +1083,67 @@ IMPORTANTE:
         
         # Fallback: respuesta básica cuando no se puede parsear o procesar
         if data is None:
+            # Logging detallado para diagnóstico
             logger.error(
-                f"No se pudo parsear o procesar la respuesta de IA para candidato {candidate_id or filename}. "
-                f"Respuesta recibida (primeros 500 chars): {raw_response[:500]}"
+                f"No se pudo parsear o procesar la respuesta de IA para candidato {candidate_id or filename}"
             )
+            logger.error(f"Respuesta completa de IA (primeros 2000 chars): {raw_response[:2000]}")
+            logger.error(f"Respuesta completa de IA (últimos 1000 chars): {raw_response[-1000:] if len(raw_response) > 1000 else raw_response}")
+            logger.error(f"Longitud total de respuesta: {len(raw_response)} caracteres")
+            
+            # Intentar extraer información parcial incluso si el JSON está malformado
+            partial_data = {}
+            
+            # Buscar campos clave usando regex como último recurso
+            recommendation_match = re.search(r'"recommendation"\s*:\s*"([^"]+)"', raw_response, re.IGNORECASE | re.DOTALL)
+            if recommendation_match:
+                partial_data["recommendation"] = recommendation_match.group(1)
+                logger.info("Se encontró 'recommendation' usando regex")
+            
+            confidence_match = re.search(r'"confidence_level"\s*:\s*"([^"]+)"', raw_response, re.IGNORECASE)
+            if confidence_match:
+                partial_data["confidence_level"] = confidence_match.group(1)
+                logger.info("Se encontró 'confidence_level' usando regex")
+            
+            # Si encontramos al menos algunos datos parciales, intentar usarlos
+            if partial_data:
+                logger.info(f"Datos parciales extraídos: {list(partial_data.keys())}")
+                try:
+                    # Intentar construir un resultado con datos parciales
+                    conf_str = partial_data.get("confidence_level", "medium").lower()
+                    if conf_str == "high":
+                        confidence = ConfidenceLevel.HIGH
+                    elif conf_str == "low":
+                        confidence = ConfidenceLevel.LOW
+                    elif conf_str == "insufficient":
+                        confidence = ConfidenceLevel.INSUFFICIENT
+                    else:
+                        confidence = ConfidenceLevel.MEDIUM
+                    
+                    return CandidateAnalysisResult(
+                        candidateId=candidate_id,
+                        filename=filename,
+                        recommendation=partial_data.get("recommendation", "Análisis parcial disponible. La respuesta de IA tuvo problemas de formato pero se pudo extraer información básica."),
+                        objective_criteria=[
+                            ObjectiveCriterion(
+                                name="Análisis parcial",
+                                value="Se extrajo información parcial de la respuesta de IA. Algunos campos pueden estar incompletos.",
+                                weight=0.5
+                            )
+                        ],
+                        confidence_level=confidence,
+                        confidence_explanation="Análisis parcial debido a problemas de formato en la respuesta de IA. Se recomienda revisar manualmente.",
+                        missing_information=["Formato completo de respuesta de IA"],
+                        ethical_compliance=True,
+                        risks=[{
+                            "category": "cumplimiento",
+                            "level": "medio",
+                            "description": "La respuesta de IA tuvo problemas de formato, se extrajo información parcial"
+                        }]
+                    )
+                except Exception as e:
+                    logger.error(f"Error construyendo resultado parcial: {str(e)}")
+                    # Continuar con el fallback normal
         
         return CandidateAnalysisResult(
             candidateId=candidate_id,
