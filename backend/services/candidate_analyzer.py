@@ -199,8 +199,9 @@ class CandidateAnalyzer:
         y realiza comparación directa y estricta entre JD y CV.
         Trunca el contenido si es necesario para cumplir con el límite de tokens.
         """
-        # Límite de tokens del modelo (8192) menos espacio para respuesta (~2000) = ~6000 tokens para el prompt
-        MAX_PROMPT_TOKENS = 6000
+        # Límite de tokens del modelo (8192) menos espacio para respuesta (~500) = ~7500 tokens para el prompt
+        # Prioridad: CV completo sin restricciones
+        MAX_PROMPT_TOKENS = 7500
         
         # Construir el prompt base (sin JD y CV)
         prompt_base = f"""Eres un asistente de Recursos Humanos para agente-rh. Tu función es COMPARAR DIRECTAMENTE el CV del candidato con los REQUISITOS ESPECÍFICOS del Job Description.
@@ -487,31 +488,64 @@ IMPORTANTE:
         # Calcular espacio disponible para JD y CV
         available_tokens = MAX_PROMPT_TOKENS - base_tokens
         
-        # Si no hay suficiente espacio, reducir aún más
-        if available_tokens < 1000:
-            available_tokens = 1000  # Mínimo para JD y CV
+        # Si no hay suficiente espacio, usar todo el disponible
+        if available_tokens < 500:
+            available_tokens = 500  # Mínimo absoluto
         
-        # Dividir el espacio disponible: 50% JD, 50% CV
-        jd_max_tokens = available_tokens // 2
-        cv_max_tokens = available_tokens // 2
+        # Prioridad: CV completo sin restricciones
+        # Distribución: 40% JD, 60% CV (dar más espacio al CV)
+        jd_max_tokens = int(available_tokens * 0.4)
+        cv_max_tokens = int(available_tokens * 0.6)
         
-        # Truncar JD y CV si es necesario
+        # Calcular tokens reales
         jd_tokens = self._estimate_tokens(job_description)
         cv_tokens = self._estimate_tokens(cv_content)
         
-        if jd_tokens > jd_max_tokens:
-            logger.warning(
-                f"Job Description excede límite de tokens ({jd_tokens} > {jd_max_tokens}). "
-                f"Truncando para candidato {filename}"
-            )
-            job_description = self._truncate_text_intelligently(job_description, jd_max_tokens)
+        # Estrategia: Solo truncar si es absolutamente necesario
+        # Prioridad 1: CV completo (no truncar si es posible)
+        # Prioridad 2: JD completo (truncar solo si el CV ya usa todo su espacio)
         
-        if cv_tokens > cv_max_tokens:
-            logger.warning(
-                f"CV excede límite de tokens ({cv_tokens} > {cv_max_tokens}). "
-                f"Truncando para candidato {filename}"
-            )
-            cv_content = self._truncate_text_intelligently(cv_content, cv_max_tokens)
+        # Si el CV cabe en su espacio asignado, no truncar
+        if cv_tokens <= cv_max_tokens:
+            # CV completo, verificar JD
+            if jd_tokens > jd_max_tokens:
+                # Si el JD excede, intentar darle más espacio del CV si el CV no lo usa todo
+                cv_used = cv_tokens
+                cv_remaining = cv_max_tokens - cv_used
+                if cv_remaining > 0:
+                    # Dar el espacio sobrante del CV al JD
+                    jd_max_tokens = jd_max_tokens + cv_remaining
+                
+                if jd_tokens > jd_max_tokens:
+                    logger.warning(
+                        f"Job Description excede límite de tokens ({jd_tokens} > {jd_max_tokens}). "
+                        f"Truncando JD para candidato {filename}"
+                    )
+                    job_description = self._truncate_text_intelligently(job_description, jd_max_tokens)
+        else:
+            # CV excede su espacio, pero intentar no truncarlo
+            # Primero, ver si podemos darle más espacio reduciendo el JD
+            if jd_tokens <= jd_max_tokens:
+                # JD cabe, dar espacio extra al CV
+                jd_used = jd_tokens
+                jd_remaining = jd_max_tokens - jd_used
+                cv_max_tokens = cv_max_tokens + jd_remaining
+            
+            # Si aún excede, truncar CV como último recurso
+            if cv_tokens > cv_max_tokens:
+                logger.warning(
+                    f"CV excede límite de tokens ({cv_tokens} > {cv_max_tokens}). "
+                    f"Truncando CV como último recurso para candidato {filename}"
+                )
+                cv_content = self._truncate_text_intelligently(cv_content, cv_max_tokens)
+            
+            # Verificar JD después de ajustar CV
+            if jd_tokens > jd_max_tokens:
+                logger.warning(
+                    f"Job Description excede límite de tokens ({jd_tokens} > {jd_max_tokens}). "
+                    f"Truncando JD para candidato {filename}"
+                )
+                job_description = self._truncate_text_intelligently(job_description, jd_max_tokens)
         
         # Construir el prompt final
         final_prompt = prompt_base.format(job_description=job_description, cv_content=cv_content)
@@ -554,9 +588,12 @@ IMPORTANTE:
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.1,
-                max_tokens=2500,
+                max_tokens=3000,  # Aumentado para respuestas completas
             )
-            return response.choices[0].message.content
+            content = response.choices[0].message.content
+            if not content or content.strip() == "":
+                raise ValueError("La respuesta de OpenAI está vacía")
+            return content
         except Exception as e:
             logger.error(f"Error llamando OpenAI: {e}")
             raise
@@ -573,12 +610,17 @@ IMPORTANTE:
             
             message = self.anthropic_client.messages.create(
                 model=anthropic_model,
-                max_tokens=2500,
+                max_tokens=3000,  # Aumentado para respuestas completas
                 temperature=0.1,
                 system="Eres un asistente ético de Recursos Humanos especializado en comparación estricta entre Job Descriptions y CVs. Evalúas candidatos comparando DIRECTAMENTE los requisitos del JD con la experiencia del CV. Eres ESTRICTO: no das puntajes altos si no hay coincidencias reales. Aplicas principios de objetividad, neutralidad, equidad, no discriminación y privacidad. NO usas, infieres ni mencionas datos personales protegidos. Evalúas solo competencias y habilidades relevantes para el desempeño laboral. Eres consciente de sesgos y los evitas activamente.",
                 messages=[{"role": "user", "content": prompt}],
             )
-            return message.content[0].text
+            if not message.content or len(message.content) == 0:
+                raise ValueError("La respuesta de Anthropic está vacía")
+            content = message.content[0].text
+            if not content or content.strip() == "":
+                raise ValueError("La respuesta de Anthropic está vacía")
+            return content
         except Exception as e:
             logger.error(f"Error llamando Anthropic: {e}")
             raise
@@ -598,10 +640,15 @@ IMPORTANTE:
                 prompt,
                 generation_config=genai.types.GenerationConfig(
                     temperature=0.1,
-                    max_output_tokens=2500,
+                    max_output_tokens=3000,  # Aumentado para respuestas completas
                 )
             )
-            return response.text
+            if not response or not response.text:
+                raise ValueError("La respuesta de Gemini está vacía")
+            content = response.text
+            if not content or content.strip() == "":
+                raise ValueError("La respuesta de Gemini está vacía")
+            return content
         except Exception as e:
             logger.error(f"Error llamando Gemini: {e}")
             raise
@@ -618,6 +665,11 @@ IMPORTANTE:
         import json
         import re
         
+        # Validar que la respuesta no esté vacía
+        if not raw_response or not raw_response.strip():
+            logger.error(f"Respuesta de IA vacía para candidato {candidate_id or filename}")
+            raise ValueError("La respuesta de IA está vacía")
+        
         # Limpiar la respuesta: remover markdown code blocks si existen
         cleaned_response = raw_response.strip()
         
@@ -625,6 +677,17 @@ IMPORTANTE:
         cleaned_response = re.sub(r'```(?:json)?\s*\n?', '', cleaned_response, flags=re.IGNORECASE)
         cleaned_response = re.sub(r'```\s*$', '', cleaned_response, flags=re.MULTILINE)
         cleaned_response = cleaned_response.strip()
+        
+        # Verificar si la respuesta parece estar incompleta (termina abruptamente)
+        if cleaned_response and not cleaned_response.endswith('}') and '{' in cleaned_response:
+            # Contar llaves para ver si está balanceado
+            open_braces = cleaned_response.count('{')
+            close_braces = cleaned_response.count('}')
+            if open_braces > close_braces:
+                logger.warning(
+                    f"Respuesta de IA parece incompleta para candidato {candidate_id or filename}. "
+                    f"Llaves abiertas: {open_braces}, cerradas: {close_braces}"
+                )
         
         # Intentar múltiples estrategias para extraer JSON
         data = None
