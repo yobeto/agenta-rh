@@ -86,6 +86,43 @@ class CandidateAnalyzer:
                     filename=candidate.filename
                 )
                 analyses.append(analysis)
+            except KeyError as ke:
+                # Capturar KeyError específicamente antes de que se propague
+                error_msg = f"Error de formato en respuesta de IA: {str(ke)}"
+                error_type = "KeyError"
+                logger.error(
+                    f"KeyError analizando candidato {candidate.candidateId or candidate.filename}: {str(ke)}"
+                )
+                logger.debug(f"Traceback completo del KeyError: {repr(ke)}", exc_info=True)
+                
+                # Crear un resultado de error específico para KeyError
+                recommendation_msg = (
+                    f"Error al procesar la respuesta de IA para este candidato. "
+                    "El formato de la respuesta no fue el esperado. "
+                    "Por favor, intenta nuevamente. Si el problema persiste, contacta al administrador del sistema."
+                )
+                
+                analyses.append(CandidateAnalysisResult(
+                    candidateId=candidate.candidateId,
+                    filename=candidate.filename,
+                    recommendation=recommendation_msg,
+                    objective_criteria=[
+                        ObjectiveCriterion(
+                            name="Error técnico (KeyError)",
+                            value=f"Error de formato en respuesta de IA: {str(ke)[:300]}",
+                            weight=0.0
+                        )
+                    ],
+                    confidence_level=ConfidenceLevel.INSUFFICIENT,
+                    confidence_explanation=f"Error durante el análisis: KeyError. La respuesta de IA no tenía el formato esperado.",
+                    missing_information=["Análisis no completado debido a error técnico en formato de respuesta"],
+                    ethical_compliance=True,
+                    risks=[{
+                        "category": "cumplimiento",
+                        "level": "alto",
+                        "description": f"Error técnico durante el análisis (KeyError): {str(ke)[:200]}"
+                    }]
+                ))
             except Exception as e:
                 error_msg = str(e)
                 error_type = type(e).__name__
@@ -95,10 +132,11 @@ class CandidateAnalyzer:
                 logger.debug(f"Traceback completo del error: {repr(e)}", exc_info=True)
                 
                 # Crear un resultado de error más informativo
+                # No mencionar tamaño ya que no hay restricciones de tamaño
                 recommendation_msg = (
                     f"Error al analizar este candidato: {error_msg[:200]}. "
                     "Por favor, revisa el CV e intenta nuevamente. "
-                    "Si el problema persiste, puede ser que el CV o Job Description sean demasiado largos."
+                    "Si el problema persiste, contacta al administrador del sistema."
                 )
                 
                 analyses.append(CandidateAnalysisResult(
@@ -796,29 +834,40 @@ IMPORTANTE:
                 # Esto previene cualquier KeyError, incluso si hay claves con formato extraño
                 safe_data = {}
                 # Usar .items() con try/except para manejar cualquier formato de clave
-                for key, value in data.items():
-                    try:
-                        # Normalizar la clave para buscar
-                        normalized_key = str(key).strip().replace('\n', '').replace('\r', '')
-                        # Remover comillas
-                        while (normalized_key.startswith('"') and normalized_key.endswith('"')) or \
-                              (normalized_key.startswith("'") and normalized_key.endswith("'")):
-                            if len(normalized_key) >= 2:
-                                normalized_key = normalized_key[1:-1].strip()
-                            else:
-                                break
-                        # Si después de normalizar la clave está vacía, usar un nombre por defecto
-                        if not normalized_key:
-                            normalized_key = f"key_{len(safe_data)}"
-                        # Guardar con clave normalizada
-                        safe_data[normalized_key] = value
-                    except Exception as e:
-                        # Si hay cualquier error al procesar esta clave, registrar y continuar
-                        logger.warning(f"Error normalizando clave '{key}': {str(e)}. Omitiendo esta clave.")
-                        continue
-                
-                # Usar safe_data en lugar de data para todos los accesos
-                data = safe_data
+                try:
+                    for key, value in data.items():
+                        try:
+                            # Normalizar la clave para buscar
+                            normalized_key = str(key).strip().replace('\n', '').replace('\r', '')
+                            # Remover comillas
+                            while (normalized_key.startswith('"') and normalized_key.endswith('"')) or \
+                                  (normalized_key.startswith("'") and normalized_key.endswith("'")):
+                                if len(normalized_key) >= 2:
+                                    normalized_key = normalized_key[1:-1].strip()
+                                else:
+                                    break
+                            # Si después de normalizar la clave está vacía, usar un nombre por defecto
+                            if not normalized_key:
+                                normalized_key = f"key_{len(safe_data)}"
+                            # Guardar con clave normalizada
+                            safe_data[normalized_key] = value
+                        except (KeyError, AttributeError, TypeError) as e:
+                            # Si hay cualquier error al procesar esta clave, registrar y continuar
+                            logger.warning(f"Error normalizando clave '{key}': {type(e).__name__} - {str(e)}. Omitiendo esta clave.")
+                            continue
+                        except Exception as e:
+                            # Si hay cualquier otro error al procesar esta clave, registrar y continuar
+                            logger.warning(f"Error inesperado normalizando clave '{key}': {type(e).__name__} - {str(e)}. Omitiendo esta clave.")
+                            continue
+                    
+                    # Usar safe_data en lugar de data para todos los accesos
+                    data = safe_data
+                except (KeyError, AttributeError, TypeError) as e:
+                    # Si hay un error al iterar sobre data.items(), registrar y usar data original
+                    logger.error(f"Error iterando sobre claves del diccionario: {type(e).__name__} - {str(e)}")
+                    logger.error(f"Tipo de data: {type(data)}, Claves disponibles: {list(data.keys()) if isinstance(data, dict) else 'N/A'}")
+                    # Continuar con data original pero usando solo .get()
+                    pass
                 
                 # Convertir criterios
                 criteria = []
