@@ -5,6 +5,7 @@ Aplica principios éticos estrictos y formato de respuesta específico
 import os
 import logging
 from typing import List, Optional
+from string import Template
 from openai import OpenAI
 from anthropic import Anthropic
 import google.generativeai as genai
@@ -254,7 +255,8 @@ class CandidateAnalyzer:
         MAX_PROMPT_TOKENS = 100000  # 100k tokens para el prompt (suficiente para CVs muy largos)
         
         # Construir el prompt base (sin JD y CV)
-        prompt_base = f"""Eres un asistente de Recursos Humanos para agente-rh. Tu función es COMPARAR DIRECTAMENTE el CV del candidato con los REQUISITOS ESPECÍFICOS del Job Description.
+        # Usar $job_description, $cv_content, $filename como placeholders para Template
+        prompt_base = """Eres un asistente de Recursos Humanos para agente-rh. Tu función es COMPARAR DIRECTAMENTE el CV del candidato con los REQUISITOS ESPECÍFICOS del Job Description.
 
 MÉTODO DE ANÁLISIS (OBLIGATORIO - SEGUIR EN ORDEN):
 
@@ -404,11 +406,11 @@ Resultado: Mismas habilidades técnicas, industria diferente pero transferible �
 
 JOB DESCRIPTION (referencia principal - REQUISITOS A CUMPLIR):
 
-{{job_description}}
+$job_description
 
-CV ANALIZADO ({filename} - COMPARAR CON REQUISITOS ARRIBA):
+CV ANALIZADO ($filename - COMPARAR CON REQUISITOS ARRIBA):
 
-{{cv_content}}
+$cv_content
 
 INSTRUCCIONES FINALES (SEGUIR EN ORDEN):
 
@@ -542,14 +544,24 @@ IMPORTANTE:
             f"y CV de {len(cv_content)} caracteres (sin restricciones de tamaño)"
         )
         
-        # ESCAPAR LLAVES en el contenido para evitar KeyError en .format()
-        # Si el JD o CV contiene llaves {}, Python las interpreta como placeholders de formato
-        # Solución: duplicar las llaves para escaparlas: { -> {{, } -> }}
-        job_description_escaped = job_description.replace('{', '{{').replace('}', '}}')
-        cv_content_escaped = cv_content.replace('{', '{{').replace('}', '}}')
-        
-        # Construir el prompt final con el contenido completo (con llaves escapadas)
-        final_prompt = prompt_base.format(job_description=job_description_escaped, cv_content=cv_content_escaped)
+        # Usar Template en lugar de .format() para evitar problemas con llaves {}
+        # Template usa $variable en lugar de {variable}, lo que es más seguro cuando el contenido tiene llaves
+        # NO necesitamos escapar llaves porque Template no las interpreta como placeholders
+        try:
+            template = Template(prompt_base)
+            final_prompt = template.safe_substitute(
+                job_description=job_description,
+                cv_content=cv_content,
+                filename=filename
+            )
+        except Exception as e:
+            # Si hay un error, registrar información de diagnóstico
+            logger.error(f"❌ Error al construir prompt con Template: {type(e).__name__} - {str(e)}")
+            logger.error(f"🔍 JD tiene {len(job_description)} caracteres")
+            logger.error(f"🔍 CV tiene {len(cv_content)} caracteres")
+            logger.error(f"🔍 JD (primeros 500 chars): {job_description[:500]}")
+            logger.error(f"🔍 CV (primeros 500 chars): {cv_content[:500]}")
+            raise
         
         # Logging informativo (no restrictivo)
         final_tokens = self._estimate_tokens(final_prompt)
