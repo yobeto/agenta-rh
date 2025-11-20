@@ -520,7 +520,7 @@ button {
   display: grid;
   gap: 2rem;
   grid-template-columns: minmax(0, 1.6fr) minmax(260px, 1fr);
-  padding: 2.75rem;
+  padding: 2rem 2.75rem;
   border-radius: 1.5rem;
   position: relative;
   overflow: hidden;
@@ -548,7 +548,7 @@ button {
 .hero__content {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1rem;
 }
 
 .hero__brand {
@@ -559,9 +559,10 @@ button {
 
 .hero__logo {
   position: relative;
-  width: 320px;
-  height: 320px;
-  margin-bottom: 1.5rem;
+  width: 360px;
+  height: 360px;
+  margin-bottom: 0.75rem;
+  margin-top: -0.5rem;
 }
 
 .hero__badge {
@@ -576,6 +577,7 @@ button {
 .hero__title {
   font-size: clamp(2rem, 4vw, 2.6rem);
   margin: 0;
+  margin-top: -0.5rem;
   color: #f8fafc;
 }
 
@@ -1634,8 +1636,9 @@ button {
   }
 
   .hero__logo {
-    width: 240px !important;
-    height: 240px !important;
+    width: 280px !important;
+    height: 280px !important;
+    margin-top: -0.25rem !important;
   }
 
   .hero__pills {
@@ -1690,8 +1693,9 @@ button {
   }
 
   .hero__logo {
-    width: 200px !important;
-    height: 200px !important;
+    width: 240px !important;
+    height: 240px !important;
+    margin-top: -0.25rem !important;
   }
 
   .hero__title {

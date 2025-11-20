@@ -146,7 +146,7 @@ export default function Home() {
               fill
               priority
               style={{ objectFit: 'contain' }}
-              sizes="(max-width: 768px) 280px, 320px"
+              sizes="(max-width: 768px) 280px, (max-width: 520px) 240px, 360px"
             />
           </div>
           <h1 id="intro" className="hero__title">
