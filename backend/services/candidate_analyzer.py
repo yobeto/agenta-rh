@@ -748,14 +748,23 @@ IMPORTANTE:
         
         # Si logramos parsear el JSON, procesarlo
         if data:
-            try:
-                # Validar que data sea un diccionario
-                if not isinstance(data, dict):
-                    logger.error(
-                        f"El JSON parseado no es un diccionario para candidato {candidate_id or filename}. "
-                        f"Tipo: {type(data)}, Valor: {str(data)[:200]}"
-                    )
-                    raise ValueError(f"El JSON parseado no es un diccionario, es {type(data)}")
+            # Validar que data sea un diccionario ANTES de cualquier acceso
+            if not isinstance(data, dict):
+                logger.error(
+                    f"El JSON parseado no es un diccionario para candidato {candidate_id or filename}. "
+                    f"Tipo: {type(data)}, Valor: {str(data)[:200]}"
+                )
+                # Continuar al fallback
+                data = None
+            else:
+                # Normalizar las claves del diccionario (remover espacios y saltos de línea)
+                # Esto previene errores por claves con formato extraño
+                normalized_data = {}
+                for key, value in data.items():
+                    # Normalizar la clave: remover espacios y saltos de línea
+                    normalized_key = str(key).strip().replace('\n', '').replace('\r', '')
+                    normalized_data[normalized_key] = value
+                data = normalized_data
                 
                 # Validar que tenga al menos algunos campos esperados
                 if not any(key in data for key in ["recommendation", "objective_criteria", "confidence_level"]):
@@ -763,6 +772,10 @@ IMPORTANTE:
                         f"El JSON parseado no tiene los campos esperados para candidato {candidate_id or filename}. "
                         f"Campos encontrados: {list(data.keys()) if isinstance(data, dict) else 'N/A'}"
                     )
+        
+        # Si logramos parsear el JSON y es un diccionario válido, procesarlo
+        if data and isinstance(data, dict):
+            try:
                 
                 # Convertir criterios
                 criteria = []
@@ -897,21 +910,41 @@ IMPORTANTE:
                     ethical_compliance=True,
                     risks=risks if risks else None
                 )
+            except KeyError as ke:
+                # Capturar KeyError específicamente
+                logger.error(
+                    f"KeyError al procesar datos parseados para {candidate_id or filename}: {str(ke)}"
+                )
+                logger.error(f"Claves disponibles en data: {list(data.keys()) if isinstance(data, dict) else 'N/A'}")
+                logger.error(f"Tipo de datos: {type(data)}, Contenido: {str(data)[:500] if data else 'None'}")
+                # Continuar al fallback
+                data = None
+            except (ValueError, TypeError, AttributeError) as ve:
+                # Capturar errores de tipo y valor
+                logger.error(
+                    f"Error de tipo/valor al procesar datos parseados para {candidate_id or filename}: {type(ve).__name__} - {str(ve)}"
+                )
+                logger.error(f"Tipo de datos: {type(data)}, Contenido: {str(data)[:500] if data else 'None'}")
+                # Continuar al fallback
+                data = None
             except Exception as e:
+                # Capturar cualquier otro error
                 error_type = type(e).__name__
                 error_msg = str(e)
                 logger.error(
-                    f"Error procesando datos parseados para {candidate_id or filename}: {error_type} - {error_msg}"
+                    f"Error inesperado procesando datos parseados para {candidate_id or filename}: {error_type} - {error_msg}"
                 )
                 logger.error(f"Tipo de datos: {type(data)}, Contenido: {str(data)[:500] if data else 'None'}")
                 logger.debug(f"Traceback completo:", exc_info=True)
                 # Continuar al fallback
+                data = None
         
-        # Fallback: respuesta básica cuando no se puede parsear
-        logger.error(
-            f"No se pudo parsear la respuesta de IA para candidato {candidate_id or filename}. "
-            f"Respuesta recibida (primeros 500 chars): {raw_response[:500]}"
-        )
+        # Fallback: respuesta básica cuando no se puede parsear o procesar
+        if data is None:
+            logger.error(
+                f"No se pudo parsear o procesar la respuesta de IA para candidato {candidate_id or filename}. "
+                f"Respuesta recibida (primeros 500 chars): {raw_response[:500]}"
+            )
         
         return CandidateAnalysisResult(
             candidateId=candidate_id,

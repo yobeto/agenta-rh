@@ -215,8 +215,23 @@ async def analyze_candidate(
 ):
     """
     Analiza uno o varios candidatos aplicando principios éticos estrictos.
+    El Job Description debe venir de una posición seleccionada o ser cargado manualmente.
     """
     try:
+        # Validar que el Job Description no esté vacío
+        if not request.jobDescription or not request.jobDescription.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="El Job Description no puede estar vacío. Por favor, selecciona una posición o carga un JD."
+            )
+        
+        # Validar que haya candidatos
+        if not request.candidates or len(request.candidates) == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Debes cargar al menos un CV para analizar."
+            )
+        
         # Validar que la solicitud cumple con principios éticos
         validation_result = ethical_validator.validate_request(request)
         if not validation_result.is_valid:
@@ -224,6 +239,11 @@ async def analyze_candidate(
                 status_code=400,
                 detail=f"Validación ética fallida: {validation_result.reason}"
             )
+        
+        logger.info(
+            f"Analizando {len(request.candidates)} candidato(s) con JD de {len(request.jobDescription)} caracteres. "
+            f"Usuario: {current_user.get('username', 'unknown')}"
+        )
         
         analyses = await candidate_analyzer.analyze_batch(
             job_description=request.jobDescription,
