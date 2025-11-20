@@ -107,7 +107,8 @@ export function CreatePositionForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div style={{ maxWidth: '800px', margin: '0 auto', padding: '0 1rem' }}>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {/* Mensajes de éxito/error */}
       {success && (
         <div style={{
@@ -343,6 +344,7 @@ export function CreatePositionForm() {
         </button>
       </div>
     </form>
+    </div>
   )
 }
 

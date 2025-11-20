@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react'
 import { createUser } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
-import { Loader2, AlertCircle, CheckCircle2, UserPlus, Mail, Building2, Shield, Lock, Eye, EyeOff, Check, X } from 'lucide-react'
+import { Loader2, AlertTriangle, CheckCircle2, UserPlus, Mail, Building2, Shield, Lock, Eye, EyeOff, Check, X } from 'lucide-react'
 
 export function CreateUserForm() {
   const { user } = useAuth()
@@ -16,7 +16,7 @@ export function CreateUserForm() {
     role: 'user'
   })
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
@@ -41,24 +41,41 @@ export function CreateUserForm() {
     return null
   }
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target
+    setFormData(prev => ({ ...prev, [name]: value }))
+    setError(null)
+    setSuccess(false)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
-    setSuccess(null)
+    setSuccess(false)
 
     // Validaciones
-    if (formData.password !== formData.confirmPassword) {
-      setError('Las contraseñas no coinciden')
+    if (!formData.username.trim()) {
+      setError('El nombre de usuario es requerido')
       return
     }
 
-    if (formData.password.length < 8) {
-      setError('La contraseña debe tener al menos 8 caracteres')
+    if (!formData.email.trim()) {
+      setError('El correo electrónico es requerido')
       return
     }
 
     if (!formData.email.endsWith('@inbursa.com')) {
       setError('El email debe ser del dominio @inbursa.com')
+      return
+    }
+
+    if (!isPasswordValid) {
+      setError('La contraseña no cumple con los requisitos mínimos')
+      return
+    }
+
+    if (!passwordsMatch) {
+      setError('Las contraseñas no coinciden')
       return
     }
 
@@ -76,7 +93,7 @@ export function CreateUserForm() {
         department: formData.department,
         role: formData.role
       })
-      setSuccess('Usuario creado exitosamente')
+      setSuccess(true)
       setFormData({
         username: '',
         password: '',
@@ -85,6 +102,8 @@ export function CreateUserForm() {
         department: 'RH',
         role: 'user'
       })
+      // Ocultar mensaje de éxito después de 5 segundos
+      setTimeout(() => setSuccess(false), 5000)
     } catch (err: any) {
       setError(err.response?.data?.detail || err.message || 'Error al crear usuario')
     } finally {
@@ -93,278 +112,394 @@ export function CreateUserForm() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto">
-      {/* Header mejorado */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#003b71] to-[#0b5ca8] flex items-center justify-center text-white shadow-lg">
-            <UserPlus className="w-5 h-5" />
-          </div>
-          <h2 className="text-2xl font-bold text-slate-900">
-            Crear nuevo usuario
-          </h2>
-        </div>
-        <p className="text-sm text-slate-600 ml-13">
-          Completa el formulario para crear un nuevo usuario del sistema
-        </p>
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Mensajes de estado */}
-        {error && (
-          <div className="bg-red-50 border-l-4 border-red-500 text-red-800 px-5 py-4 rounded-lg flex items-start gap-3 shadow-sm">
-            <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5 text-red-600" />
-            <div className="flex-1">
-              <p className="font-semibold text-sm">Error al crear usuario</p>
-              <p className="text-sm mt-1">{error}</p>
-            </div>
-          </div>
-        )}
-
+    <div style={{ maxWidth: '800px', margin: '0 auto', padding: '0 1rem' }}>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        {/* Mensajes de éxito/error */}
         {success && (
-          <div className="bg-green-50 border-l-4 border-green-500 text-green-800 px-5 py-4 rounded-lg flex items-start gap-3 shadow-sm">
-            <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5 text-green-600" />
-            <div className="flex-1">
-              <p className="font-semibold text-sm">Usuario creado exitosamente</p>
-              <p className="text-sm mt-1">{success}</p>
+          <div style={{
+            padding: '1rem',
+            background: '#f0fdf4',
+            border: '1px solid #86efac',
+            borderRadius: '0.5rem',
+            color: '#166534',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem'
+          }}>
+            <CheckCircle2 size={20} />
+            <div>
+              <strong>Usuario creado exitosamente</strong>
+              <p style={{ margin: 0, fontSize: '0.875rem', marginTop: '0.25rem' }}>
+                El usuario está disponible para iniciar sesión.
+              </p>
             </div>
           </div>
         )}
 
-        {/* Sección: Información básica */}
-        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-          <div className="flex items-center gap-2 mb-5 pb-3 border-b border-slate-200">
-            <UserPlus className="w-5 h-5 text-[#003b71] flex-shrink-0" />
-            <h3 className="text-lg font-bold text-slate-900">
-              Información básica
-            </h3>
+        {error && (
+          <div style={{
+            padding: '1rem',
+            background: '#fef2f2',
+            border: '1px solid #fca5a5',
+            borderRadius: '0.5rem',
+            color: '#991b1b',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem'
+          }}>
+            <AlertTriangle size={20} />
+            <div>
+              <strong>Error</strong>
+              <p style={{ margin: 0, fontSize: '0.875rem', marginTop: '0.25rem' }}>{error}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Nombre de usuario y Email en fila */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div>
+            <label htmlFor="username" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', fontWeight: 600, color: '#0f172a' }}>
+              <UserPlus size={16} />
+              Nombre de usuario *
+            </label>
+            <input
+              type="text"
+              id="username"
+              name="username"
+              value={formData.username}
+              onChange={handleInputChange}
+              required
+              placeholder="usuario"
+              disabled={isLoading}
+              pattern="[a-zA-Z0-9_]{3,50}"
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: '1px solid #cbd5e1',
+                borderRadius: '0.5rem',
+                fontSize: '0.95rem',
+                outline: 'none',
+                transition: 'border-color 0.2s'
+              }}
+              onFocus={(e) => e.currentTarget.style.borderColor = '#003b71'}
+              onBlur={(e) => e.currentTarget.style.borderColor = '#cbd5e1'}
+            />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div>
-              <label htmlFor="username" className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-2">
-                <UserPlus className="h-4 w-4 text-[#003b71] flex-shrink-0" />
-                <span>Nombre de usuario *</span>
-              </label>
-              <input
-                id="username"
-                type="text"
-                value={formData.username}
-                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                required
-                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#003b71] focus:border-[#003b71] outline-none transition-all text-slate-900 placeholder-slate-400 text-sm hover:border-slate-400"
-                placeholder="usuario"
-                disabled={isLoading}
-                pattern="[a-zA-Z0-9_]{3,50}"
-                title="3-50 caracteres, solo letras, números y guiones bajos"
-              />
-              <p className="text-xs text-slate-500 mt-1.5 ml-6">3-50 caracteres, solo letras, números y guiones bajos</p>
-            </div>
-
-            <div>
-              <label htmlFor="email" className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-2">
-                <Mail className="h-4 w-4 text-[#003b71] flex-shrink-0" />
-                <span>Correo electrónico *</span>
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                required
-                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#003b71] focus:border-[#003b71] outline-none transition-all text-slate-900 placeholder-slate-400 text-sm hover:border-slate-400"
-                placeholder="usuario@inbursa.com"
-                disabled={isLoading}
-              />
-            </div>
+          <div>
+            <label htmlFor="email" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', fontWeight: 600, color: '#0f172a' }}>
+              <Mail size={16} />
+              Correo electrónico *
+            </label>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              value={formData.email}
+              onChange={handleInputChange}
+              required
+              placeholder="usuario@inbursa.com"
+              disabled={isLoading}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: '1px solid #cbd5e1',
+                borderRadius: '0.5rem',
+                fontSize: '0.95rem',
+                outline: 'none',
+                transition: 'border-color 0.2s'
+              }}
+              onFocus={(e) => e.currentTarget.style.borderColor = '#003b71'}
+              onBlur={(e) => e.currentTarget.style.borderColor = '#cbd5e1'}
+            />
           </div>
         </div>
 
-        {/* Sección: Seguridad */}
-        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-          <div className="flex items-center gap-2 mb-5 pb-3 border-b border-slate-200">
-            <Lock className="w-5 h-5 text-[#003b71] flex-shrink-0" />
-            <h3 className="text-lg font-bold text-slate-900">
-              Seguridad
-            </h3>
+        {/* Contraseña y Confirmar contraseña en fila */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div>
+            <label htmlFor="password" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', fontWeight: 600, color: '#0f172a' }}>
+              <Lock size={16} />
+              Contraseña *
+            </label>
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                id="password"
+                name="password"
+                value={formData.password}
+                onChange={handleInputChange}
+                required
+                placeholder="Mínimo 8 caracteres"
+                disabled={isLoading}
+                minLength={8}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  paddingRight: '2.5rem',
+                  border: `1px solid ${formData.password.length > 0
+                    ? isPasswordValid
+                      ? '#86efac'
+                      : '#fca5a5'
+                    : '#cbd5e1'}`,
+                  borderRadius: '0.5rem',
+                  fontSize: '0.95rem',
+                  outline: 'none',
+                  transition: 'border-color 0.2s',
+                  background: formData.password.length > 0
+                    ? isPasswordValid
+                      ? '#f0fdf4'
+                      : '#fef2f2'
+                    : 'white'
+                }}
+                onFocus={(e) => e.currentTarget.style.borderColor = '#003b71'}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = formData.password.length > 0
+                    ? isPasswordValid
+                      ? '#86efac'
+                      : '#fca5a5'
+                    : '#cbd5e1'
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: 'absolute',
+                  right: '0.75rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#64748b',
+                  display: 'flex',
+                  alignItems: 'center'
+                }}
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+            {formData.password.length > 0 && (
+              <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: '#f8fafc', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
+                <p style={{ fontSize: '0.75rem', fontWeight: 600, color: '#334155', marginBottom: '0.5rem', margin: 0 }}>Requisitos de contraseña:</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+                  {Object.entries({
+                    minLength: 'Mínimo 8 caracteres',
+                    hasUpperCase: 'Una letra mayúscula',
+                    hasLowerCase: 'Una letra minúscula',
+                    hasNumber: 'Un número',
+                    hasSpecial: 'Un carácter especial',
+                  }).map(([key, label]) => {
+                    const isValid = passwordValidation[key as keyof typeof passwordValidation]
+                    return (
+                      <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem' }}>
+                        {isValid ? (
+                          <Check size={14} style={{ color: '#059669', flexShrink: 0 }} />
+                        ) : (
+                          <X size={14} style={{ color: '#cbd5e1', flexShrink: 0 }} />
+                        )}
+                        <span style={{ color: isValid ? '#059669' : '#64748b', fontWeight: isValid ? 500 : 400 }}>
+                          {label}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div>
-              <label htmlFor="password" className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-2">
-                <Lock className="h-4 w-4 text-[#003b71] flex-shrink-0" />
-                <span>Contraseña *</span>
-              </label>
-              <div className="relative">
-                <input
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  required
-                  className={`w-full px-4 pr-12 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#003b71] outline-none transition-all text-slate-900 placeholder-slate-400 text-sm hover:border-slate-400 ${
-                    formData.password.length > 0
-                      ? isPasswordValid
-                        ? 'border-green-400 focus:border-green-500 bg-green-50/30'
-                        : 'border-red-300 focus:border-red-500 bg-red-50/30'
-                      : 'border-slate-300 focus:border-[#003b71]'
-                  }`}
-                  placeholder="Mínimo 8 caracteres"
-                  disabled={isLoading}
-                  minLength={8}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition"
-                  tabIndex={-1}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-              {formData.password.length > 0 && (
-                <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
-                  <p className="text-xs font-semibold text-slate-700 mb-2">Requisitos de contraseña:</p>
-                  <div className="space-y-1.5">
-                    {Object.entries({
-                      minLength: 'Mínimo 8 caracteres',
-                      hasUpperCase: 'Una letra mayúscula',
-                      hasLowerCase: 'Una letra minúscula',
-                      hasNumber: 'Un número',
-                      hasSpecial: 'Un carácter especial',
-                    }).map(([key, label]) => {
-                      const isValid = passwordValidation[key as keyof typeof passwordValidation]
-                      return (
-                        <div key={key} className="flex items-center gap-2 text-xs">
-                          {isValid ? (
-                            <Check className="h-3.5 w-3.5 text-green-600 flex-shrink-0" />
-                          ) : (
-                            <X className="h-3.5 w-3.5 text-slate-300 flex-shrink-0" />
-                          )}
-                          <span className={isValid ? 'text-green-700 font-medium' : 'text-slate-500'}>
-                            {label}
-                          </span>
-                        </div>
-                      )
-                    })}
+          <div>
+            <label htmlFor="confirmPassword" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', fontWeight: 600, color: '#0f172a' }}>
+              <Lock size={16} />
+              Confirmar contraseña *
+            </label>
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showConfirmPassword ? 'text' : 'password'}
+                id="confirmPassword"
+                name="confirmPassword"
+                value={formData.confirmPassword}
+                onChange={handleInputChange}
+                required
+                placeholder="Repite la contraseña"
+                disabled={isLoading}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  paddingRight: '2.5rem',
+                  border: `1px solid ${formData.confirmPassword.length > 0
+                    ? passwordsMatch
+                      ? '#86efac'
+                      : '#fca5a5'
+                    : '#cbd5e1'}`,
+                  borderRadius: '0.5rem',
+                  fontSize: '0.95rem',
+                  outline: 'none',
+                  transition: 'border-color 0.2s',
+                  background: formData.confirmPassword.length > 0
+                    ? passwordsMatch
+                      ? '#f0fdf4'
+                      : '#fef2f2'
+                    : 'white'
+                }}
+                onFocus={(e) => e.currentTarget.style.borderColor = '#003b71'}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = formData.confirmPassword.length > 0
+                    ? passwordsMatch
+                      ? '#86efac'
+                      : '#fca5a5'
+                    : '#cbd5e1'
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                style={{
+                  position: 'absolute',
+                  right: '0.75rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#64748b',
+                  display: 'flex',
+                  alignItems: 'center'
+                }}
+                tabIndex={-1}
+              >
+                {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+            {formData.confirmPassword.length > 0 && (
+              <div style={{ marginTop: '0.75rem' }}>
+                {passwordsMatch ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem', color: '#059669', background: '#f0fdf4', padding: '0.5rem 0.75rem', borderRadius: '0.5rem', border: '1px solid #86efac' }}>
+                    <Check size={16} />
+                    <span style={{ fontWeight: 500 }}>Las contraseñas coinciden</span>
                   </div>
-                </div>
-              )}
-            </div>
-
-            <div>
-              <label htmlFor="confirmPassword" className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-2">
-                <Lock className="h-4 w-4 text-[#003b71] flex-shrink-0" />
-                <span>Confirmar contraseña *</span>
-              </label>
-              <div className="relative">
-                <input
-                  id="confirmPassword"
-                  type={showConfirmPassword ? 'text' : 'password'}
-                  value={formData.confirmPassword}
-                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                  required
-                  className={`w-full px-4 pr-12 py-2.5 border rounded-lg focus:ring-2 focus:ring-[#003b71] outline-none transition-all text-slate-900 placeholder-slate-400 text-sm hover:border-slate-400 ${
-                    formData.confirmPassword.length > 0
-                      ? passwordsMatch
-                        ? 'border-green-400 focus:border-green-500 bg-green-50/30'
-                        : 'border-red-300 focus:border-red-500 bg-red-50/30'
-                      : 'border-slate-300 focus:border-[#003b71]'
-                  }`}
-                  placeholder="Repite la contraseña"
-                  disabled={isLoading}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition"
-                  tabIndex={-1}
-                >
-                  {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem', color: '#dc2626', background: '#fef2f2', padding: '0.5rem 0.75rem', borderRadius: '0.5rem', border: '1px solid #fca5a5' }}>
+                    <X size={16} />
+                    <span style={{ fontWeight: 500 }}>Las contraseñas no coinciden</span>
+                  </div>
+                )}
               </div>
-              {formData.confirmPassword.length > 0 && (
-                <div className="mt-3">
-                  {passwordsMatch ? (
-                    <div className="flex items-center gap-2 text-xs text-green-700 bg-green-50 px-3 py-2 rounded-lg border border-green-200">
-                      <Check className="h-4 w-4" />
-                      <span className="font-medium">Las contraseñas coinciden</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg border border-red-200">
-                      <X className="h-4 w-4" />
-                      <span className="font-medium">Las contraseñas no coinciden</span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+            )}
           </div>
         </div>
 
-        {/* Sección: Configuración */}
-        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-          <div className="flex items-center gap-2 mb-5 pb-3 border-b border-slate-200">
-            <Shield className="w-5 h-5 text-[#003b71] flex-shrink-0" />
-            <h3 className="text-lg font-bold text-slate-900">
-              Configuración
-            </h3>
+        {/* Departamento y Rol en fila */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div>
+            <label htmlFor="department" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', fontWeight: 600, color: '#0f172a' }}>
+              <Building2 size={16} />
+              Departamento *
+            </label>
+            <select
+              id="department"
+              name="department"
+              value={formData.department}
+              onChange={handleInputChange}
+              required
+              disabled={isLoading}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: '1px solid #cbd5e1',
+                borderRadius: '0.5rem',
+                fontSize: '0.95rem',
+                outline: 'none',
+                background: 'white',
+                cursor: 'pointer',
+                transition: 'border-color 0.2s'
+              }}
+              onFocus={(e) => e.currentTarget.style.borderColor = '#003b71'}
+              onBlur={(e) => e.currentTarget.style.borderColor = '#cbd5e1'}
+            >
+              <option value="RH">RH</option>
+            </select>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div>
-              <label htmlFor="department" className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-2">
-                <Building2 className="h-4 w-4 text-[#003b71] flex-shrink-0" />
-                <span>Departamento *</span>
-              </label>
-              <select
-                id="department"
-                value={formData.department}
-                onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                required
-                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#003b71] focus:border-[#003b71] outline-none transition-all bg-white text-slate-900 text-sm hover:border-slate-400 cursor-pointer"
-                disabled={isLoading}
-              >
-                <option value="RH">RH</option>
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="role" className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-2">
-                <Shield className="h-4 w-4 text-[#003b71] flex-shrink-0" />
-                <span>Rol *</span>
-              </label>
-              <select
-                id="role"
-                value={formData.role}
-                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                required
-                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#003b71] focus:border-[#003b71] outline-none transition-all bg-white text-slate-900 text-sm hover:border-slate-400 cursor-pointer"
-                disabled={isLoading}
-              >
-                <option value="user">Usuario</option>
-                <option value="admin">Administrador</option>
-              </select>
-            </div>
+          <div>
+            <label htmlFor="role" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', fontWeight: 600, color: '#0f172a' }}>
+              <Shield size={16} />
+              Rol *
+            </label>
+            <select
+              id="role"
+              name="role"
+              value={formData.role}
+              onChange={handleInputChange}
+              required
+              disabled={isLoading}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: '1px solid #cbd5e1',
+                borderRadius: '0.5rem',
+                fontSize: '0.95rem',
+                outline: 'none',
+                background: 'white',
+                cursor: 'pointer',
+                transition: 'border-color 0.2s'
+              }}
+              onFocus={(e) => e.currentTarget.style.borderColor = '#003b71'}
+              onBlur={(e) => e.currentTarget.style.borderColor = '#cbd5e1'}
+            >
+              <option value="user">Usuario</option>
+              <option value="admin">Administrador</option>
+            </select>
           </div>
         </div>
 
-        {/* Botón de acción */}
-        <div className="flex items-center justify-end gap-4 pt-2">
+        {/* Botón de envío */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '0.5rem' }}>
           <button
             type="submit"
-            disabled={isLoading || !isPasswordValid || !passwordsMatch}
-            className="px-8 py-3 bg-gradient-to-r from-[#003b71] to-[#0b5ca8] text-white rounded-lg font-semibold hover:from-[#002d56] hover:to-[#0a4a87] focus:outline-none focus:ring-2 focus:ring-[#003b71] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl text-sm"
+            disabled={isLoading || !isPasswordValid || !passwordsMatch || !formData.username.trim() || !formData.email.trim()}
+            style={{
+              padding: '0.75rem 2rem',
+              background: isLoading || !isPasswordValid || !passwordsMatch || !formData.username.trim() || !formData.email.trim()
+                ? '#cbd5e1'
+                : 'linear-gradient(135deg, #003b71, #0b5ca8)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '0.5rem',
+              fontSize: '0.95rem',
+              fontWeight: 600,
+              cursor: isLoading || !isPasswordValid || !passwordsMatch || !formData.username.trim() || !formData.email.trim() ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              transition: 'all 0.2s',
+              boxShadow: isLoading || !isPasswordValid || !passwordsMatch || !formData.username.trim() || !formData.email.trim()
+                ? 'none'
+                : '0 2px 4px rgba(0, 59, 113, 0.2)'
+            }}
+            onMouseEnter={(e) => {
+              if (!isLoading && isPasswordValid && passwordsMatch && formData.username.trim() && formData.email.trim()) {
+                e.currentTarget.style.boxShadow = '0 4px 8px rgba(0, 59, 113, 0.3)'
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isLoading && isPasswordValid && passwordsMatch && formData.username.trim() && formData.email.trim()) {
+                e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 59, 113, 0.2)'
+              }
+            }}
           >
             {isLoading ? (
               <>
-                <Loader2 className="w-5 h-5 animate-spin" />
+                <Loader2 size={18} className="animate-spin" />
                 <span>Creando usuario...</span>
               </>
             ) : (
               <>
-                <UserPlus className="w-5 h-5" />
-                <span>Crear usuario</span>
+                <UserPlus size={18} />
+                <span>Crear Usuario</span>
               </>
             )}
           </button>

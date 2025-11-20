@@ -548,7 +548,7 @@ button {
 .hero__content {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1.5rem;
 }
 
 .hero__brand {
@@ -559,8 +559,9 @@ button {
 
 .hero__logo {
   position: relative;
-  width: 200px;
-  height: 200px;
+  width: 320px;
+  height: 320px;
+  margin-bottom: 1.5rem;
 }
 
 .hero__badge {
@@ -1633,8 +1634,8 @@ button {
   }
 
   .hero__logo {
-    width: 150px !important;
-    height: 150px !important;
+    width: 240px !important;
+    height: 240px !important;
   }
 
   .hero__pills {
@@ -1689,8 +1690,8 @@ button {
   }
 
   .hero__logo {
-    width: 120px !important;
-    height: 120px !important;
+    width: 200px !important;
+    height: 200px !important;
   }
 
   .hero__title {

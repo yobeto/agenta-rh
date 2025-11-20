@@ -146,21 +146,16 @@ export default function Home() {
               fill
               priority
               style={{ objectFit: 'contain' }}
-              sizes="320px"
+              sizes="(max-width: 768px) 280px, 320px"
             />
           </div>
           <h1 id="intro" className="hero__title">
             Asistente GPT de RH para la pre-selección de candidatos
           </h1>
           <p className="hero__description">
-            Carga la descripción del puesto y los CVs en PDF. Nuestro asistente genera comparativos objetivos,
-            destaca riesgos éticos y te acompaña en la toma de decisiones.
+            Selecciona una posición abierta y carga los CVs de los candidatos. El asistente analiza cada perfil
+            de forma objetiva, identifica riesgos éticos y proporciona recomendaciones para apoyar tu decisión.
           </p>
-          <div className="hero__pills" role="list">
-            <span role="listitem"><ShieldCheck size={16} /> Cumplimiento ético automatizado</span>
-            <span role="listitem"><BarChart3 size={16} /> Puntajes comparativos inmediatos</span>
-            <span role="listitem"><Sparkles size={16} /> Flujos guiados en 3 pasos</span>
-          </div>
           <div className="hero__actions">
             <button type="button" className="btn-outline hero__chat" onClick={openChat}>
               <MessageCircle size={18} />
@@ -176,8 +171,8 @@ export default function Home() {
                 <FileText size={18} />
               </div>
               <div>
-                <strong>Job Description</strong>
-                <span>Sube el PDF para extraer criterios clave.</span>
+                <strong>Selecciona la posición</strong>
+                <span>Elige la vacante para la cual deseas analizar candidatos.</span>
               </div>
             </li>
             <li>
@@ -185,8 +180,8 @@ export default function Home() {
                 <Users size={18} />
               </div>
               <div>
-                <strong>CVs de talento</strong>
-                <span>Procesa varios currículums en segundos.</span>
+                <strong>Carga los CVs</strong>
+                <span>Sube los currículums de los candidatos en formato PDF.</span>
               </div>
             </li>
             <li>
@@ -194,8 +189,8 @@ export default function Home() {
                 <BarChart3 size={18} />
               </div>
               <div>
-                <strong>Insight accionable</strong>
-                <span>Obtén síntesis y puntajes comparativos.</span>
+                <strong>Revisa el análisis</strong>
+                <span>Consulta los resultados, puntajes y recomendaciones para cada candidato.</span>
               </div>
             </li>
           </ul>
