@@ -43,11 +43,26 @@ export default function RootLayout({
             <p>Esta aplicación requiere JavaScript para funcionar.</p>
           </div>
         </noscript>
-        <ErrorBoundary>
-          <AuthProvider>
-            {children}
-          </AuthProvider>
-        </ErrorBoundary>
+        <div id="app-root">
+          <ErrorBoundary>
+            <AuthProvider>
+              {children}
+            </AuthProvider>
+          </ErrorBoundary>
+        </div>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              // Fallback: si después de 5 segundos no hay contenido, mostrar mensaje
+              setTimeout(function() {
+                const root = document.getElementById('app-root');
+                if (root && root.children.length === 0) {
+                  root.innerHTML = '<div style="padding: 2rem; text-align: center; min-height: 100vh; display: flex; align-items: center; justify-content: center; flex-direction: column;"><h1 style="color: #003b71; margin-bottom: 1rem;">Cargando aplicación...</h1><p style="color: #64748b;">Si esto persiste, recarga la página.</p><button onclick="window.location.reload()" style="margin-top: 1rem; padding: 0.75rem 1.5rem; background: #003b71; color: white; border: none; border-radius: 8px; cursor: pointer;">Recargar</button></div>';
+                }
+              }, 5000);
+            `,
+          }}
+        />
       </body>
     </html>
   )

@@ -23,21 +23,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
 # Hacer el script de build ejecutable y ejecutarlo
-# Si el build falla, este comando fallará automáticamente
+# El build.sh ya verifica BUILD_ID, así que no necesitamos verificación adicional
 RUN chmod +x ./build.sh && ./build.sh
-
-# Verificar que el build se completó correctamente
-RUN echo "🔍 Verificando BUILD_ID..." && \
-    if [ ! -f .next/BUILD_ID ]; then \
-      echo "❌ ERROR: BUILD_ID no se generó. El build falló." && \
-      echo "Contenido de .next:" && \
-      ls -la .next/ 2>&1 || true && \
-      exit 1; \
-    else \
-      BUILD_ID_VALUE=$(cat .next/BUILD_ID) && \
-      echo "✅ BUILD_ID generado correctamente: ${BUILD_ID_VALUE}" && \
-      echo "✅ Verificación completada exitosamente"; \
-    fi
 
 # Production image
 FROM node:20-alpine AS runner

@@ -35,36 +35,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
 
   // Cargar token y usuario del localStorage al iniciar
+  // INICIALIZAR INMEDIATAMENTE para evitar bloqueos
   useEffect(() => {
-    let isMounted = true
-    
-    // Timeout de seguridad: si algo falla, asegurar que isLoading se resuelva
+    // Resolver isLoading inmediatamente si estamos en el servidor
+    if (typeof window === 'undefined') {
+      setIsLoading(false)
+      return
+    }
+
+    // Timeout MUY corto: resolver en máximo 500ms
     const timeoutId = setTimeout(() => {
-      if (isMounted) {
-        console.warn('AuthContext: Timeout de seguridad activado, resolviendo isLoading')
-        setIsLoading(false)
-      }
-    }, 3000) // 3 segundos máximo
+      setIsLoading(false)
+    }, 500)
 
     try {
-      // Verificar que estamos en el cliente (localStorage solo existe en el navegador)
-      if (typeof window === 'undefined') {
-        if (isMounted) {
-          setIsLoading(false)
-        }
-        clearTimeout(timeoutId)
-        return
-      }
-
       const storedToken = localStorage.getItem(TOKEN_KEY)
       const storedUser = localStorage.getItem(USER_KEY)
       
       if (storedToken && storedUser) {
         try {
-          if (isMounted) {
-            setToken(storedToken)
-            setUser(JSON.parse(storedUser))
-          }
+          setToken(storedToken)
+          setUser(JSON.parse(storedUser))
         } catch (error) {
           console.error('Error parsing stored user:', error)
           localStorage.removeItem(TOKEN_KEY)
@@ -72,20 +63,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
       
-      if (isMounted) {
-        setIsLoading(false)
-      }
+      // Resolver inmediatamente después de verificar
+      setIsLoading(false)
       clearTimeout(timeoutId)
     } catch (error) {
       console.error('Error loading auth state:', error)
-      if (isMounted) {
-        setIsLoading(false)
-      }
+      setIsLoading(false)
       clearTimeout(timeoutId)
     }
 
     return () => {
-      isMounted = false
       clearTimeout(timeoutId)
     }
   }, [])

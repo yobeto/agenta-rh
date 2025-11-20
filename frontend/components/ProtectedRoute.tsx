@@ -1,73 +1,101 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
-import { Loader2 } from 'lucide-react'
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth()
-  const router = useRouter()
-  const [shouldRedirect, setShouldRedirect] = useState(false)
-  const [forceShow, setForceShow] = useState(false)
+  const [mounted, setMounted] = useState(false)
+  const [showContent, setShowContent] = useState(false)
 
-  // Timeout de seguridad: después de 3 segundos, forzar mostrar contenido o redirigir
+  // Marcar como montado inmediatamente
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      console.warn('ProtectedRoute: Timeout de seguridad activado')
-      if (!isAuthenticated) {
-        setShouldRedirect(true)
-      } else {
-        setForceShow(true)
-      }
-    }, 3000)
+    setMounted(true)
+    // Forzar mostrar contenido después de 1 segundo máximo
+    const timer = setTimeout(() => {
+      setShowContent(true)
+    }, 1000)
+    return () => clearTimeout(timer)
+  }, [])
 
-    return () => clearTimeout(timeoutId)
-  }, [isAuthenticated])
-
-  // Redirigir si no está autenticado
+  // Redirigir a login si no está autenticado (después de verificar)
   useEffect(() => {
-    if (shouldRedirect || (!isLoading && !isAuthenticated && !forceShow)) {
-      console.log('ProtectedRoute: Redirigiendo a login')
-      // Usar window.location para forzar la redirección
+    if (mounted && !isLoading && !isAuthenticated) {
       const timer = setTimeout(() => {
         window.location.href = '/login'
-      }, 100)
+      }, 500)
       return () => clearTimeout(timer)
     }
-  }, [isAuthenticated, isLoading, shouldRedirect, forceShow])
+  }, [mounted, isLoading, isAuthenticated])
 
-  // Si está cargando y no ha pasado el timeout, mostrar loader
-  if (isLoading && !forceShow) {
+  // Si está cargando y aún no ha pasado el timeout, mostrar loader
+  if (isLoading && !showContent) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
-          <p className="text-slate-600">Cargando...</p>
-          <p className="text-sm text-slate-400 mt-2">Verificando autenticación...</p>
+      <div style={{ 
+        minHeight: '100vh', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        background: '#f8fafc' 
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            width: '2rem',
+            height: '2rem',
+            border: '3px solid #e2e8f0',
+            borderTop: '3px solid #2563eb',
+            borderRadius: '50%',
+            margin: '0 auto 1rem',
+            animation: 'spin 1s linear infinite'
+          }} />
+          <style dangerouslySetInnerHTML={{
+            __html: `
+              @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+              }
+            `
+          }} />
+          <p style={{ color: '#475569', marginBottom: '0.5rem' }}>Cargando...</p>
+          <p style={{ color: '#94a3b8', fontSize: '0.875rem' }}>Verificando autenticación...</p>
         </div>
       </div>
     )
   }
 
-  // Si no está autenticado y no hay que forzar, mostrar mensaje
-  if (!isAuthenticated && !forceShow) {
+  // Si no está autenticado, mostrar mensaje de redirección
+  if (!isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-center">
-          <p className="text-slate-600 text-lg">Redirigiendo al login...</p>
-          <p className="text-slate-400 text-sm mt-2">
-            Si no eres redirigido automáticamente,{' '}
-            <a href="/login" className="text-blue-600 underline">
-              haz clic aquí
-            </a>
+      <div style={{ 
+        minHeight: '100vh', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        background: '#f8fafc' 
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <p style={{ color: '#475569', fontSize: '1.125rem', marginBottom: '0.5rem' }}>
+            Redirigiendo al login...
           </p>
+          <p style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: '1rem' }}>
+            Si no eres redirigido automáticamente,
+          </p>
+          <a 
+            href="/login" 
+            style={{ 
+              color: '#2563eb', 
+              textDecoration: 'underline',
+              fontSize: '0.875rem'
+            }}
+          >
+            haz clic aquí
+          </a>
         </div>
       </div>
     )
   }
 
-  // Mostrar contenido si está autenticado o si forzamos la visualización
+  // Mostrar contenido si está autenticado
   return <>{children}</>
 }
 
