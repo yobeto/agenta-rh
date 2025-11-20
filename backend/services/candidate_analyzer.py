@@ -542,8 +542,14 @@ IMPORTANTE:
             f"y CV de {len(cv_content)} caracteres (sin restricciones de tamaño)"
         )
         
-        # Construir el prompt final con el contenido completo
-        final_prompt = prompt_base.format(job_description=job_description, cv_content=cv_content)
+        # ESCAPAR LLAVES en el contenido para evitar KeyError en .format()
+        # Si el JD o CV contiene llaves {}, Python las interpreta como placeholders de formato
+        # Solución: duplicar las llaves para escaparlas: { -> {{, } -> }}
+        job_description_escaped = job_description.replace('{', '{{').replace('}', '}}')
+        cv_content_escaped = cv_content.replace('{', '{{').replace('}', '}}')
+        
+        # Construir el prompt final con el contenido completo (con llaves escapadas)
+        final_prompt = prompt_base.format(job_description=job_description_escaped, cv_content=cv_content_escaped)
         
         # Logging informativo (no restrictivo)
         final_tokens = self._estimate_tokens(final_prompt)
