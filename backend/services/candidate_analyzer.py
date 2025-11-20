@@ -86,21 +86,39 @@ class CandidateAnalyzer:
                 )
                 analyses.append(analysis)
             except Exception as e:
-                logger.error(f"Error analizando candidato {candidate.candidateId or candidate.filename}: {str(e)}")
-                # Crear un resultado de error en lugar de fallar completamente
+                error_msg = str(e)
+                error_type = type(e).__name__
+                logger.error(
+                    f"Error analizando candidato {candidate.candidateId or candidate.filename}: {error_type} - {error_msg}"
+                )
+                logger.debug(f"Traceback completo del error: {repr(e)}", exc_info=True)
+                
+                # Crear un resultado de error más informativo
+                recommendation_msg = (
+                    f"Error al analizar este candidato: {error_msg[:200]}. "
+                    "Por favor, revisa el CV e intenta nuevamente. "
+                    "Si el problema persiste, puede ser que el CV o Job Description sean demasiado largos."
+                )
+                
                 analyses.append(CandidateAnalysisResult(
                     candidateId=candidate.candidateId,
                     filename=candidate.filename,
-                    recommendation=f"Error al analizar este candidato: {str(e)}. Por favor, revisa el CV e intenta nuevamente.",
-                    objective_criteria=[],
+                    recommendation=recommendation_msg,
+                    objective_criteria=[
+                        ObjectiveCriterion(
+                            name="Error técnico",
+                            value=f"Error tipo {error_type}: {error_msg[:300]}",
+                            weight=0.0
+                        )
+                    ],
                     confidence_level=ConfidenceLevel.INSUFFICIENT,
-                    confidence_explanation=f"Error durante el análisis: {type(e).__name__}",
+                    confidence_explanation=f"Error durante el análisis: {error_type}. {error_msg[:200]}",
                     missing_information=["Análisis no completado debido a error técnico"],
                     ethical_compliance=True,
                     risks=[{
                         "category": "cumplimiento",
                         "level": "alto",
-                        "description": f"Error técnico durante el análisis: {str(e)}"
+                        "description": f"Error técnico durante el análisis ({error_type}): {error_msg[:200]}"
                     }]
                 ))
 
@@ -600,11 +618,62 @@ IMPORTANTE:
         import json
         import re
         
-        # Intentar extraer JSON de la respuesta
-        json_match = re.search(r'\{.*\}', raw_response, re.DOTALL)
+        # Limpiar la respuesta: remover markdown code blocks si existen
+        cleaned_response = raw_response.strip()
+        
+        # Remover markdown code blocks (```json ... ``` o ``` ... ```)
+        cleaned_response = re.sub(r'```(?:json)?\s*\n?', '', cleaned_response, flags=re.IGNORECASE)
+        cleaned_response = re.sub(r'```\s*$', '', cleaned_response, flags=re.MULTILINE)
+        cleaned_response = cleaned_response.strip()
+        
+        # Intentar múltiples estrategias para extraer JSON
+        data = None
+        json_str = None
+        
+        # Estrategia 1: Buscar JSON entre llaves (más específico, busca desde la primera { hasta la última })
+        json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', cleaned_response, re.DOTALL)
         if json_match:
+            json_str = json_match.group()
+        else:
+            # Estrategia 2: Buscar desde la primera { hasta el final
+            json_match = re.search(r'\{.*$', cleaned_response, re.DOTALL)
+            if json_match:
+                json_str = json_match.group()
+        
+        # Si encontramos un candidato a JSON, intentar parsearlo
+        if json_str:
             try:
-                data = json.loads(json_match.group())
+                data = json.loads(json_str)
+            except json.JSONDecodeError as e:
+                logger.warning(f"Error parseando JSON (estrategia 1): {str(e)}")
+                logger.debug(f"JSON intentado: {json_str[:500]}...")
+                
+                # Estrategia 3: Intentar encontrar JSON válido buscando desde el inicio
+                # Buscar el primer { y luego encontrar el } correspondiente balanceado
+                start_idx = cleaned_response.find('{')
+                if start_idx != -1:
+                    brace_count = 0
+                    end_idx = start_idx
+                    for i in range(start_idx, len(cleaned_response)):
+                        if cleaned_response[i] == '{':
+                            brace_count += 1
+                        elif cleaned_response[i] == '}':
+                            brace_count -= 1
+                            if brace_count == 0:
+                                end_idx = i + 1
+                                break
+                    
+                    if brace_count == 0:
+                        json_str = cleaned_response[start_idx:end_idx]
+                        try:
+                            data = json.loads(json_str)
+                        except json.JSONDecodeError as e2:
+                            logger.warning(f"Error parseando JSON (estrategia 2): {str(e2)}")
+                            logger.debug(f"Respuesta completa (primeros 1000 chars): {raw_response[:1000]}")
+        
+        # Si logramos parsear el JSON, procesarlo
+        if data:
+            try:
                 
                 # Convertir criterios
                 criteria = []
@@ -712,28 +781,35 @@ IMPORTANTE:
                     ethical_compliance=True,
                     risks=risks if risks else None
                 )
-            except json.JSONDecodeError:
-                logger.warning("No se pudo parsear JSON de la respuesta de IA")
+            except Exception as e:
+                logger.error(f"Error procesando datos parseados para {candidate_id or filename}: {str(e)}")
+                logger.debug(f"Datos parseados: {data}")
+                # Continuar al fallback
         
-        # Fallback: respuesta básica
+        # Fallback: respuesta básica cuando no se puede parsear
+        logger.error(
+            f"No se pudo parsear la respuesta de IA para candidato {candidate_id or filename}. "
+            f"Respuesta recibida (primeros 500 chars): {raw_response[:500]}"
+        )
+        
         return CandidateAnalysisResult(
             candidateId=candidate_id,
             filename=filename,
-            recommendation="Análisis requiere revisión manual debido a formato de respuesta inesperado",
+            recommendation="Análisis requiere revisión manual debido a formato de respuesta inesperado de la IA. Por favor, intenta nuevamente o revisa el CV.",
             objective_criteria=[
                 ObjectiveCriterion(
-                    name="Análisis automático",
-                    value="Respuesta de IA no parseable",
+                    name="Error de procesamiento",
+                    value=f"La respuesta de IA no pudo ser parseada correctamente. Error: {str(raw_response[:200]) if raw_response else 'Respuesta vacía'}",
                     weight=0.0
                 )
             ],
             confidence_level=ConfidenceLevel.INSUFFICIENT,
-            confidence_explanation="No se pudo procesar la respuesta de IA correctamente",
+            confidence_explanation="No se pudo procesar la respuesta de IA correctamente. La respuesta no estaba en el formato JSON esperado.",
             missing_information=["Formato de respuesta válido de IA"],
             ethical_compliance=True,
             risks=[{
                 "category": "cumplimiento",
                 "level": "alto",
-                "description": "No se pudo procesar correctamente la respuesta de IA, requiere revisión manual"
+                "description": "No se pudo procesar correctamente la respuesta de IA, requiere revisión manual o reintento"
             }]
         )
