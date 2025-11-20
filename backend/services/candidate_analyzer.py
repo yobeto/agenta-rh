@@ -53,22 +53,56 @@ class CandidateAnalyzer:
         """
         Analiza múltiples candidatos a partir del texto extraído de sus CVs.
         """
+        # Validar que hay al menos una API key configurada
+        if not self.openai_client and not self.anthropic_client and not self.gemini_configured:
+            raise ValueError(
+                "No hay servicio de IA configurado. "
+                "Configura al menos una de: OPENAI_API_KEY, ANTHROPIC_API_KEY, o GOOGLE_API_KEY"
+            )
+        
+        # Validar que hay candidatos
+        if not candidates or len(candidates) == 0:
+            raise ValueError("No se proporcionaron candidatos para analizar")
+        
+        # Validar que hay job description
+        if not job_description or not job_description.strip():
+            raise ValueError("No se proporcionó la descripción del puesto (Job Description)")
+
         analyses: List[CandidateAnalysisResult] = []
 
         for candidate in candidates:
-            prompt = self._build_ethical_prompt(
-                job_description=job_description,
-                cv_content=candidate.content,
-                filename=candidate.filename
-            )
+            try:
+                prompt = self._build_ethical_prompt(
+                    job_description=job_description,
+                    cv_content=candidate.content,
+                    filename=candidate.filename
+                )
 
-            raw_response = await self._call_ai(prompt, model_id=model_id)
-            analysis = self._parse_response(
-                raw_response=raw_response,
-                candidate_id=candidate.candidateId,
-                filename=candidate.filename
-            )
-            analyses.append(analysis)
+                raw_response = await self._call_ai(prompt, model_id=model_id)
+                analysis = self._parse_response(
+                    raw_response=raw_response,
+                    candidate_id=candidate.candidateId,
+                    filename=candidate.filename
+                )
+                analyses.append(analysis)
+            except Exception as e:
+                logger.error(f"Error analizando candidato {candidate.candidateId or candidate.filename}: {str(e)}")
+                # Crear un resultado de error en lugar de fallar completamente
+                analyses.append(CandidateAnalysisResult(
+                    candidateId=candidate.candidateId,
+                    filename=candidate.filename,
+                    recommendation=f"Error al analizar este candidato: {str(e)}. Por favor, revisa el CV e intenta nuevamente.",
+                    objective_criteria=[],
+                    confidence_level=ConfidenceLevel.INSUFFICIENT,
+                    confidence_explanation=f"Error durante el análisis: {type(e).__name__}",
+                    missing_information=["Análisis no completado debido a error técnico"],
+                    ethical_compliance=True,
+                    risks=[{
+                        "category": "cumplimiento",
+                        "level": "alto",
+                        "description": f"Error técnico durante el análisis: {str(e)}"
+                    }]
+                ))
 
         return analyses
 

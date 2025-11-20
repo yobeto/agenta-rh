@@ -248,10 +248,18 @@ async def analyze_candidate(
     except HTTPException:
         raise
     except Exception as e:
+        import traceback
+        error_traceback = traceback.format_exc()
         logger.error(f"Error analizando candidato: {str(e)}")
+        logger.error(f"Traceback completo: {error_traceback}")
+        # En producción, no exponer el traceback completo por seguridad
+        # Pero sí el tipo de error para ayudar con el diagnóstico
+        error_detail = f"Error interno al analizar candidato: {type(e).__name__}"
+        if os.getenv("ENVIRONMENT") != "production":
+            error_detail += f" - {str(e)}"
         raise HTTPException(
             status_code=500,
-            detail="Error interno al analizar candidato"
+            detail=error_detail
         )
 
 
