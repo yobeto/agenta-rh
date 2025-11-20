@@ -42,7 +42,8 @@ class CandidateAnalyzer:
         else:
             self.gemini_configured = False
         
-        self.default_model = os.getenv("DEFAULT_AI_MODEL", "gpt-4")
+        # Usar modelos con contextos grandes por defecto para soportar CVs y JDs sin restricciones
+        self.default_model = os.getenv("DEFAULT_AI_MODEL", "gpt-4-turbo-preview")  # 128k tokens
     
     async def analyze_batch(
         self,
@@ -199,9 +200,11 @@ class CandidateAnalyzer:
         y realiza comparación directa y estricta entre JD y CV.
         Trunca el contenido si es necesario para cumplir con el límite de tokens.
         """
-        # Límite de tokens del modelo (8192) menos espacio para respuesta (~500) = ~7500 tokens para el prompt
-        # Prioridad: CV completo sin restricciones
-        MAX_PROMPT_TOKENS = 7500
+        # SIN RESTRICCIONES DE TAMAÑO: Usar modelos con contextos grandes
+        # GPT-4 Turbo: 128k tokens, Claude Sonnet 4: 200k tokens, Gemini 2.5 Pro: 1M tokens
+        # Dejamos un margen para la respuesta (10k tokens) y usamos el resto para el prompt
+        # Esto permite analizar CVs y JDs de cualquier tamaño sin truncamiento
+        MAX_PROMPT_TOKENS = 100000  # 100k tokens para el prompt (suficiente para CVs muy largos)
         
         # Construir el prompt base (sin JD y CV)
         prompt_base = f"""Eres un asistente de Recursos Humanos para agente-rh. Tu función es COMPARAR DIRECTAMENTE el CV del candidato con los REQUISITOS ESPECÍFICOS del Job Description.
@@ -261,7 +264,9 @@ PASO 6: PENALIZA AUSENCIAS (OBLIGATORIO):
 
 REGLAS ESTRICTAS DE ÉTICA Y EQUIDAD:
 
-1. PROPÓSITO LIMITADO: Solo analiza información laboral (experiencia, educación, certificaciones, logros). NO tomes decisiones finales.
+1. PROPÓSITO LIMITADO: Solo analiza información laboral (experiencia, educación, certificaciones, logros). 
+   IMPORTANTE: NO tomas decisiones finales. Tu función es proporcionar análisis objetivo y recomendaciones 
+   basadas en criterios medibles. La decisión final de contratar, rechazar o entrevistar SIEMPRE la toma un humano.
 
 2. VARIABLES VÁLIDAS: Considera SOLO:
    - Experiencia profesional (años, tipo, relevancia)
@@ -482,81 +487,23 @@ IMPORTANTE:
 - NO des puntajes altos sin coincidencias reales y específicas
 - Recuerda: esto es APOYO, no una decisión final"""
         
-        # Calcular tokens del prompt base (sin JD y CV)
-        base_tokens = self._estimate_tokens(prompt_base.format(job_description="", cv_content=""))
+        # SIN RESTRICCIONES: Usar CV y JD completos sin truncamiento
+        # Los modelos modernos (GPT-4 Turbo, Claude Sonnet 4, Gemini 2.5 Pro) tienen contextos
+        # suficientemente grandes para manejar CVs y JDs de cualquier tamaño razonable
+        logger.info(
+            f"Analizando candidato {filename} con JD de {len(job_description)} caracteres "
+            f"y CV de {len(cv_content)} caracteres (sin restricciones de tamaño)"
+        )
         
-        # Calcular espacio disponible para JD y CV
-        available_tokens = MAX_PROMPT_TOKENS - base_tokens
-        
-        # Si no hay suficiente espacio, usar todo el disponible
-        if available_tokens < 500:
-            available_tokens = 500  # Mínimo absoluto
-        
-        # Prioridad: CV completo sin restricciones
-        # Distribución: 40% JD, 60% CV (dar más espacio al CV)
-        jd_max_tokens = int(available_tokens * 0.4)
-        cv_max_tokens = int(available_tokens * 0.6)
-        
-        # Calcular tokens reales
-        jd_tokens = self._estimate_tokens(job_description)
-        cv_tokens = self._estimate_tokens(cv_content)
-        
-        # Estrategia: Solo truncar si es absolutamente necesario
-        # Prioridad 1: CV completo (no truncar si es posible)
-        # Prioridad 2: JD completo (truncar solo si el CV ya usa todo su espacio)
-        
-        # Si el CV cabe en su espacio asignado, no truncar
-        if cv_tokens <= cv_max_tokens:
-            # CV completo, verificar JD
-            if jd_tokens > jd_max_tokens:
-                # Si el JD excede, intentar darle más espacio del CV si el CV no lo usa todo
-                cv_used = cv_tokens
-                cv_remaining = cv_max_tokens - cv_used
-                if cv_remaining > 0:
-                    # Dar el espacio sobrante del CV al JD
-                    jd_max_tokens = jd_max_tokens + cv_remaining
-                
-                if jd_tokens > jd_max_tokens:
-                    logger.warning(
-                        f"Job Description excede límite de tokens ({jd_tokens} > {jd_max_tokens}). "
-                        f"Truncando JD para candidato {filename}"
-                    )
-                    job_description = self._truncate_text_intelligently(job_description, jd_max_tokens)
-        else:
-            # CV excede su espacio, pero intentar no truncarlo
-            # Primero, ver si podemos darle más espacio reduciendo el JD
-            if jd_tokens <= jd_max_tokens:
-                # JD cabe, dar espacio extra al CV
-                jd_used = jd_tokens
-                jd_remaining = jd_max_tokens - jd_used
-                cv_max_tokens = cv_max_tokens + jd_remaining
-            
-            # Si aún excede, truncar CV como último recurso
-            if cv_tokens > cv_max_tokens:
-                logger.warning(
-                    f"CV excede límite de tokens ({cv_tokens} > {cv_max_tokens}). "
-                    f"Truncando CV como último recurso para candidato {filename}"
-                )
-                cv_content = self._truncate_text_intelligently(cv_content, cv_max_tokens)
-            
-            # Verificar JD después de ajustar CV
-            if jd_tokens > jd_max_tokens:
-                logger.warning(
-                    f"Job Description excede límite de tokens ({jd_tokens} > {jd_max_tokens}). "
-                    f"Truncando JD para candidato {filename}"
-                )
-                job_description = self._truncate_text_intelligently(job_description, jd_max_tokens)
-        
-        # Construir el prompt final
+        # Construir el prompt final con el contenido completo
         final_prompt = prompt_base.format(job_description=job_description, cv_content=cv_content)
         
-        # Verificar que el prompt final esté dentro del límite
+        # Logging informativo (no restrictivo)
         final_tokens = self._estimate_tokens(final_prompt)
-        if final_tokens > MAX_PROMPT_TOKENS:
-            logger.warning(
-                f"Prompt final aún excede límite ({final_tokens} > {MAX_PROMPT_TOKENS}). "
-                f"Puede haber errores. Candidato: {filename}"
-            )
+        logger.debug(
+            f"Prompt final para {filename}: ~{final_tokens} tokens estimados "
+            f"(JD: ~{self._estimate_tokens(job_description)}, CV: ~{self._estimate_tokens(cv_content)})"
+        )
         
         return final_prompt
     
@@ -578,17 +525,25 @@ IMPORTANTE:
     async def _call_openai(self, prompt: str, model: str) -> str:
         """Llamar a OpenAI"""
         try:
+            # Mapear modelos a versiones con contextos grandes
+            model_map = {
+                "gpt-4": "gpt-4-turbo-preview",  # 128k tokens
+                "gpt-4-turbo": "gpt-4-turbo-preview",  # 128k tokens
+                "gpt-4-turbo-preview": "gpt-4-turbo-preview",  # 128k tokens
+            }
+            actual_model = model_map.get(model.lower(), model)
+            
             response = self.openai_client.chat.completions.create(
-                model=model,
+                model=actual_model,
                 messages=[
                     {
                         "role": "system",
-                        "content": "Eres un asistente ético de Recursos Humanos especializado en comparación estricta entre Job Descriptions y CVs. Evalúas candidatos comparando DIRECTAMENTE los requisitos del JD con la experiencia del CV. Eres ESTRICTO: no das puntajes altos si no hay coincidencias reales. Aplicas principios de objetividad, neutralidad, equidad, no discriminación y privacidad. NO usas, infieres ni mencionas datos personales protegidos. Evalúas solo competencias y habilidades relevantes para el desempeño laboral. Eres consciente de sesgos y los evitas activamente."
+                        "content": "Eres un asistente ético de Recursos Humanos especializado en comparación estricta entre Job Descriptions y CVs. Evalúas candidatos comparando DIRECTAMENTE los requisitos del JD con la experiencia del CV. Eres ESTRICTO: no das puntajes altos si no hay coincidencias reales. Aplicas principios de objetividad, neutralidad, equidad, no discriminación y privacidad. NO usas, infieres ni mencionas datos personales protegidos. Evalúas solo competencias y habilidades relevantes para el desempeño laboral. Eres consciente de sesgos y los evitas activamente. IMPORTANTE: NO tomas decisiones finales, solo proporcionas análisis y recomendaciones para que un humano tome la decisión."
                     },
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.1,
-                max_tokens=3000,  # Aumentado para respuestas completas
+                max_tokens=4000,  # Aumentado para respuestas más completas
             )
             content = response.choices[0].message.content
             if not content or content.strip() == "":
@@ -601,18 +556,19 @@ IMPORTANTE:
     async def _call_anthropic(self, prompt: str, model: str) -> str:
         """Llamar a Anthropic Claude"""
         try:
+            # Claude Sonnet 4 tiene 200k tokens de contexto, suficiente para CVs y JDs grandes
             model_map = {
-                "claude-opus-4": "claude-opus-4-20250514",
-                "claude-sonnet-4": "claude-sonnet-4-20250514",
-                "claude-haiku-3.5": "claude-3-5-haiku-20241022",
+                "claude-opus-4": "claude-opus-4-20250514",  # 200k tokens
+                "claude-sonnet-4": "claude-sonnet-4-20250514",  # 200k tokens
+                "claude-haiku-3.5": "claude-3-5-haiku-20241022",  # 200k tokens
             }
-            anthropic_model = model_map.get(model, "claude-sonnet-4-20250514")
+            anthropic_model = model_map.get(model.lower(), "claude-sonnet-4-20250514")
             
             message = self.anthropic_client.messages.create(
                 model=anthropic_model,
-                max_tokens=3000,  # Aumentado para respuestas completas
+                max_tokens=4000,  # Aumentado para respuestas más completas
                 temperature=0.1,
-                system="Eres un asistente ético de Recursos Humanos especializado en comparación estricta entre Job Descriptions y CVs. Evalúas candidatos comparando DIRECTAMENTE los requisitos del JD con la experiencia del CV. Eres ESTRICTO: no das puntajes altos si no hay coincidencias reales. Aplicas principios de objetividad, neutralidad, equidad, no discriminación y privacidad. NO usas, infieres ni mencionas datos personales protegidos. Evalúas solo competencias y habilidades relevantes para el desempeño laboral. Eres consciente de sesgos y los evitas activamente.",
+                system="Eres un asistente ético de Recursos Humanos especializado en comparación estricta entre Job Descriptions y CVs. Evalúas candidatos comparando DIRECTAMENTE los requisitos del JD con la experiencia del CV. Eres ESTRICTO: no das puntajes altos si no hay coincidencias reales. Aplicas principios de objetividad, neutralidad, equidad, no discriminación y privacidad. NO usas, infieres ni mencionas datos personales protegidos. Evalúas solo competencias y habilidades relevantes para el desempeño laboral. Eres consciente de sesgos y los evitas activamente. IMPORTANTE: NO tomas decisiones finales, solo proporcionas análisis y recomendaciones para que un humano tome la decisión.",
                 messages=[{"role": "user", "content": prompt}],
             )
             if not message.content or len(message.content) == 0:
@@ -628,20 +584,39 @@ IMPORTANTE:
     async def _call_gemini(self, prompt: str, model: str) -> str:
         """Llamar a Google Gemini"""
         try:
+            # Gemini 2.5 Pro tiene 1M tokens de contexto, más que suficiente
             model_map = {
-                "gemini-2.5-pro": "gemini-2.5-pro",
-                "gemini-2.5-flash": "gemini-2.5-flash",
-                "gemini-1.5-pro": "gemini-pro-latest",
+                "gemini-2.5-pro": "gemini-2.5-pro",  # 1M tokens
+                "gemini-2.5-flash": "gemini-2.5-flash",  # 1M tokens
+                "gemini-1.5-pro": "gemini-1.5-pro",  # 1M tokens
             }
-            gemini_model_id = model_map.get(model, "gemini-2.5-flash")
+            gemini_model_id = model_map.get(model.lower(), "gemini-2.5-pro")
             
             genai_model = genai.GenerativeModel(gemini_model_id)
             response = genai_model.generate_content(
                 prompt,
                 generation_config=genai.types.GenerationConfig(
                     temperature=0.1,
-                    max_output_tokens=3000,  # Aumentado para respuestas completas
-                )
+                    max_output_tokens=4000,  # Aumentado para respuestas más completas
+                ),
+                safety_settings=[
+                    {
+                        "category": "HARM_CATEGORY_HARASSMENT",
+                        "threshold": "BLOCK_NONE"
+                    },
+                    {
+                        "category": "HARM_CATEGORY_HATE_SPEECH",
+                        "threshold": "BLOCK_NONE"
+                    },
+                    {
+                        "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                        "threshold": "BLOCK_NONE"
+                    },
+                    {
+                        "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                        "threshold": "BLOCK_NONE"
+                    }
+                ]
             )
             if not response or not response.text:
                 raise ValueError("La respuesta de Gemini está vacía")
@@ -652,6 +627,40 @@ IMPORTANTE:
         except Exception as e:
             logger.error(f"Error llamando Gemini: {e}")
             raise
+    
+    def _normalize_dict_keys(self, obj):
+        """
+        Normaliza recursivamente todas las claves de un diccionario,
+        removiendo espacios, saltos de línea y caracteres problemáticos.
+        Esto previene KeyError por claves con formato extraño como '\n "recommendation"'
+        """
+        if isinstance(obj, dict):
+            normalized = {}
+            for key, value in obj.items():
+                # Normalizar la clave de forma agresiva
+                normalized_key = str(key)
+                # Remover TODOS los saltos de línea y retornos de carro
+                normalized_key = normalized_key.replace('\n', '').replace('\r', '')
+                # Remover espacios al inicio y final
+                normalized_key = normalized_key.strip()
+                # Remover comillas al inicio y final (puede haber múltiples)
+                while (normalized_key.startswith('"') and normalized_key.endswith('"')) or \
+                      (normalized_key.startswith("'") and normalized_key.endswith("'")):
+                    if len(normalized_key) >= 2:
+                        normalized_key = normalized_key[1:-1].strip()
+                    else:
+                        break
+                # Si después de todo esto la clave está vacía, usar un nombre por defecto
+                if not normalized_key:
+                    normalized_key = f"key_{len(normalized)}"
+                
+                # Normalizar recursivamente el valor
+                normalized[normalized_key] = self._normalize_dict_keys(value)
+            return normalized
+        elif isinstance(obj, list):
+            return [self._normalize_dict_keys(item) for item in obj]
+        else:
+            return obj
     
     def _parse_response(
         self,
@@ -712,7 +721,14 @@ IMPORTANTE:
                 while json_str_clean.startswith('\n') or json_str_clean.startswith('\r'):
                     json_str_clean = json_str_clean[1:].strip()
                 
+                # Intentar parsear
                 data = json.loads(json_str_clean)
+                
+                # NORMALIZAR TODAS LAS CLAVES DEL DICCIONARIO RECURSIVAMENTE INMEDIATAMENTE
+                # Esto previene KeyError por claves con formato extraño como '\n "recommendation"'
+                if isinstance(data, dict):
+                    data = self._normalize_dict_keys(data)
+                
             except json.JSONDecodeError as e:
                 logger.warning(f"Error parseando JSON (estrategia 1): {str(e)}")
                 logger.debug(f"JSON intentado (primeros 500 chars): {json_str[:500]}...")
@@ -739,6 +755,9 @@ IMPORTANTE:
                             json_str = json_str[1:].strip()
                         try:
                             data = json.loads(json_str)
+                            # NORMALIZAR TODAS LAS CLAVES DESPUÉS DE PARSEAR INMEDIATAMENTE
+                            if isinstance(data, dict):
+                                data = self._normalize_dict_keys(data)
                         except json.JSONDecodeError as e2:
                             logger.warning(f"Error parseando JSON (estrategia 2): {str(e2)}")
                             logger.debug(f"JSON intentado (primeros 500 chars): {json_str[:500]}...")
@@ -757,15 +776,12 @@ IMPORTANTE:
                 # Continuar al fallback
                 data = None
             else:
-                # Normalizar las claves del diccionario (remover espacios y saltos de línea)
-                # Esto previene errores por claves con formato extraño
-                normalized_data = {}
-                for key, value in data.items():
-                    # Normalizar la clave: remover espacios y saltos de línea
-                    normalized_key = str(key).strip().replace('\n', '').replace('\r', '')
-                    normalized_data[normalized_key] = value
-                data = normalized_data
-                
+                # Logging para debugging: mostrar las claves originales antes de normalizar
+                original_keys = list(data.keys())
+                logger.debug(
+                    f"Claves originales del JSON parseado para {candidate_id or filename}: {original_keys}"
+                )
+                # La normalización ya se hizo arriba, solo validar campos
                 # Validar que tenga al menos algunos campos esperados
                 if not any(key in data for key in ["recommendation", "objective_criteria", "confidence_level"]):
                     logger.warning(
@@ -776,6 +792,33 @@ IMPORTANTE:
         # Si logramos parsear el JSON y es un diccionario válido, procesarlo
         if data and isinstance(data, dict):
             try:
+                # Crear un wrapper seguro que siempre use .get() y maneje claves normalizadas
+                # Esto previene cualquier KeyError, incluso si hay claves con formato extraño
+                safe_data = {}
+                # Usar .items() con try/except para manejar cualquier formato de clave
+                for key, value in data.items():
+                    try:
+                        # Normalizar la clave para buscar
+                        normalized_key = str(key).strip().replace('\n', '').replace('\r', '')
+                        # Remover comillas
+                        while (normalized_key.startswith('"') and normalized_key.endswith('"')) or \
+                              (normalized_key.startswith("'") and normalized_key.endswith("'")):
+                            if len(normalized_key) >= 2:
+                                normalized_key = normalized_key[1:-1].strip()
+                            else:
+                                break
+                        # Si después de normalizar la clave está vacía, usar un nombre por defecto
+                        if not normalized_key:
+                            normalized_key = f"key_{len(safe_data)}"
+                        # Guardar con clave normalizada
+                        safe_data[normalized_key] = value
+                    except Exception as e:
+                        # Si hay cualquier error al procesar esta clave, registrar y continuar
+                        logger.warning(f"Error normalizando clave '{key}': {str(e)}. Omitiendo esta clave.")
+                        continue
+                
+                # Usar safe_data en lugar de data para todos los accesos
+                data = safe_data
                 
                 # Convertir criterios
                 criteria = []
