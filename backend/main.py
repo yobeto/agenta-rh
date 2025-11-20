@@ -40,12 +40,19 @@ from fastapi import Depends
 
 load_dotenv()
 
-# Configurar logging
+# Configurar logging - Mejorado para producción y debugging
+log_level = os.getenv("LOG_LEVEL", "INFO").upper()
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=getattr(logging, log_level, logging.INFO),
+    format='%(asctime)s - [%(levelname)s] - %(name)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),  # Salida a consola (stdout/stderr)
+    ]
 )
 logger = logging.getLogger(__name__)
+
+# En producción, los logs van a stdout/stderr que Render captura automáticamente
+logger.info(f"Logging configurado con nivel: {log_level}")
 
 app = FastAPI(
     title="agente-rh API",

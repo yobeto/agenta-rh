@@ -80,20 +80,29 @@ class CandidateAnalyzer:
                 )
 
                 raw_response = await self._call_ai(prompt, model_id=model_id)
+                
+                # Logging de la respuesta de IA para debugging
+                logger.info(f"✅ Respuesta de IA recibida para {candidate.filename} ({len(raw_response)} caracteres)")
+                logger.debug(f"📄 Primeros 500 chars de respuesta: {raw_response[:500]}")
+                
                 analysis = self._parse_response(
                     raw_response=raw_response,
                     candidate_id=candidate.candidateId,
                     filename=candidate.filename
                 )
                 analyses.append(analysis)
+                logger.info(f"✅ Análisis completado exitosamente para {candidate.filename}")
             except KeyError as ke:
                 # Capturar KeyError específicamente antes de que se propague
                 error_msg = f"Error de formato en respuesta de IA: {str(ke)}"
                 error_type = "KeyError"
                 logger.error(
-                    f"KeyError analizando candidato {candidate.candidateId or candidate.filename}: {str(ke)}"
+                    f"❌ KeyError analizando candidato {candidate.candidateId or candidate.filename}: {str(ke)}"
                 )
-                logger.debug(f"Traceback completo del KeyError: {repr(ke)}", exc_info=True)
+                logger.error(f"📋 Traceback completo del KeyError:", exc_info=True)
+                # Logging adicional para diagnóstico
+                logger.error(f"🔍 Este error indica que la respuesta de IA no tenía el formato JSON esperado")
+                logger.error(f"🔍 Revisa los logs anteriores para ver la respuesta completa de la IA")
                 
                 # Crear un resultado de error específico para KeyError
                 recommendation_msg = (
@@ -675,25 +684,49 @@ IMPORTANTE:
         if isinstance(obj, dict):
             normalized = {}
             for key, value in obj.items():
-                # Normalizar la clave de forma agresiva
-                normalized_key = str(key)
-                # Remover TODOS los saltos de línea y retornos de carro
-                normalized_key = normalized_key.replace('\n', '').replace('\r', '')
-                # Remover espacios al inicio y final
-                normalized_key = normalized_key.strip()
-                # Remover comillas al inicio y final (puede haber múltiples)
-                while (normalized_key.startswith('"') and normalized_key.endswith('"')) or \
-                      (normalized_key.startswith("'") and normalized_key.endswith("'")):
-                    if len(normalized_key) >= 2:
-                        normalized_key = normalized_key[1:-1].strip()
-                    else:
-                        break
-                # Si después de todo esto la clave está vacía, usar un nombre por defecto
-                if not normalized_key:
-                    normalized_key = f"key_{len(normalized)}"
-                
-                # Normalizar recursivamente el valor
-                normalized[normalized_key] = self._normalize_dict_keys(value)
+                try:
+                    # Normalizar la clave de forma MUY agresiva
+                    normalized_key = str(key)
+                    
+                    # Paso 1: Remover TODOS los saltos de línea, retornos de carro y tabs
+                    normalized_key = normalized_key.replace('\n', '').replace('\r', '').replace('\t', '')
+                    
+                    # Paso 2: Remover espacios al inicio y final
+                    normalized_key = normalized_key.strip()
+                    
+                    # Paso 3: Remover comillas al inicio y final (puede haber múltiples)
+                    # Manejar casos como: '\n  "recommendation"' o '"recommendation"' o "'recommendation'"
+                    while len(normalized_key) >= 2:
+                        if (normalized_key.startswith('"') and normalized_key.endswith('"')) or \
+                           (normalized_key.startswith("'") and normalized_key.endswith("'")):
+                            normalized_key = normalized_key[1:-1].strip()
+                        else:
+                            break
+                    
+                    # Paso 4: Remover espacios múltiples y normalizar
+                    normalized_key = ' '.join(normalized_key.split())
+                    
+                    # Paso 5: Si después de todo esto la clave está vacía, usar un nombre por defecto
+                    if not normalized_key:
+                        normalized_key = f"key_{len(normalized)}"
+                    
+                    # Paso 6: Si hay claves duplicadas después de normalizar, agregar sufijo
+                    if normalized_key in normalized:
+                        counter = 1
+                        original_key = normalized_key
+                        while normalized_key in normalized:
+                            normalized_key = f"{original_key}_{counter}"
+                            counter += 1
+                    
+                    # Normalizar recursivamente el valor
+                    normalized[normalized_key] = self._normalize_dict_keys(value)
+                    
+                except Exception as e:
+                    # Si hay cualquier error normalizando esta clave, usar un nombre seguro
+                    logger.warning(f"⚠️ Error normalizando clave '{key}': {str(e)}. Usando nombre por defecto.")
+                    safe_key = f"key_{len(normalized)}_{hash(str(key)) % 10000}"
+                    normalized[safe_key] = self._normalize_dict_keys(value)
+            
             return normalized
         elif isinstance(obj, list):
             return [self._normalize_dict_keys(item) for item in obj]
@@ -762,10 +795,21 @@ IMPORTANTE:
                 # Intentar parsear
                 data = json.loads(json_str_clean)
                 
+                # LOGGING: Mostrar claves originales ANTES de normalizar
+                if isinstance(data, dict):
+                    original_keys_before = list(data.keys())
+                    logger.info(f"🔑 Claves originales del JSON (antes de normalizar): {original_keys_before}")
+                    logger.info(f"🔑 Tipos de claves: {[type(k).__name__ for k in original_keys_before]}")
+                    logger.info(f"🔑 Representación de claves: {[repr(k) for k in original_keys_before[:5]]}")
+                
                 # NORMALIZAR TODAS LAS CLAVES DEL DICCIONARIO RECURSIVAMENTE INMEDIATAMENTE
                 # Esto previene KeyError por claves con formato extraño como '\n "recommendation"'
                 if isinstance(data, dict):
                     data = self._normalize_dict_keys(data)
+                    
+                    # LOGGING: Mostrar claves después de normalizar
+                    normalized_keys_after = list(data.keys())
+                    logger.info(f"✅ Claves normalizadas del JSON (después de normalizar): {normalized_keys_after}")
                 
             except json.JSONDecodeError as e:
                 logger.warning(f"Error parseando JSON (estrategia 1): {str(e)}")
@@ -1083,13 +1127,21 @@ IMPORTANTE:
         
         # Fallback: respuesta básica cuando no se puede parsear o procesar
         if data is None:
-            # Logging detallado para diagnóstico
-            logger.error(
-                f"No se pudo parsear o procesar la respuesta de IA para candidato {candidate_id or filename}"
-            )
-            logger.error(f"Respuesta completa de IA (primeros 2000 chars): {raw_response[:2000]}")
-            logger.error(f"Respuesta completa de IA (últimos 1000 chars): {raw_response[-1000:] if len(raw_response) > 1000 else raw_response}")
-            logger.error(f"Longitud total de respuesta: {len(raw_response)} caracteres")
+            # Logging detallado para diagnóstico - MEJORADO PARA VISIBILIDAD
+            logger.error("=" * 80)
+            logger.error(f"❌ ERROR: No se pudo parsear respuesta de IA para candidato: {candidate_id or filename}")
+            logger.error("=" * 80)
+            logger.error(f"📏 Longitud total de respuesta: {len(raw_response)} caracteres")
+            logger.error(f"📄 Respuesta completa de IA (primeros 3000 chars):")
+            logger.error("-" * 80)
+            logger.error(raw_response[:3000])
+            logger.error("-" * 80)
+            if len(raw_response) > 3000:
+                logger.error(f"📄 Respuesta completa de IA (últimos 1000 chars):")
+                logger.error("-" * 80)
+                logger.error(raw_response[-1000:])
+                logger.error("-" * 80)
+            logger.error("=" * 80)
             
             # Intentar extraer información parcial incluso si el JSON está malformado
             partial_data = {}
