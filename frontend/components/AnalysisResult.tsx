@@ -19,6 +19,13 @@ interface CandidateAction {
   notes?: string
 }
 
+interface PendingAction {
+  candidateId: string
+  candidateFilename: string
+  status: CandidateStatus
+  reason: string
+}
+
 const confidenceLabels: Record<string, string> = {
   high: 'Confianza alta',
   medium: 'Confianza media',
@@ -65,7 +72,9 @@ export function AnalysisResult({ results }: Props) {
   const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({})
   const [selectedCandidates, setSelectedCandidates] = useState<Set<string>>(new Set())
   const [candidateActions, setCandidateActions] = useState<Record<string, CandidateAction>>({})
+  const [pendingActions, setPendingActions] = useState<Record<string, PendingAction>>({})
   const [showBulkActions, setShowBulkActions] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [actionModal, setActionModal] = useState<{
     isOpen: boolean
     candidateId: string | null
@@ -140,101 +149,75 @@ export function AnalysisResult({ results }: Props) {
     })
   }
 
-  const handleActionConfirm = async (reason: string) => {
+  const handleActionConfirm = (reason: string) => {
     if (!actionModal.candidateId || !actionModal.action || !actionModal.result) return
 
     const candidateId = actionModal.candidateId
     const status = actionModal.action
     const result = actionModal.result
 
-    try {
-      // Enviar al backend
-      await registerCandidateAction({
-        candidate_id: candidateId,
-        candidate_filename: result.filename,
-        action: status,
-        reason: reason || undefined
-      })
-      
-      // Actualizar estado local
-      setCandidateActions(prev => ({
-        ...prev,
-        [candidateId]: { candidateId, status, notes: reason }
-      }))
-      setSelectedCandidates(prev => {
-        const next = new Set(prev)
-        next.delete(candidateId)
-        return next
-      })
-    } catch (error) {
-      console.error('Error registrando acción:', error)
-      // Aún así actualizar el estado local para feedback inmediato
-      setCandidateActions(prev => ({
-        ...prev,
-        [candidateId]: { candidateId, status, notes: reason }
-      }))
-    } finally {
-      setActionModal({ isOpen: false, candidateId: null, action: null, result: null })
-    }
+    // Guardar como acción pendiente (NO enviar al backend todavía)
+    setPendingActions(prev => ({
+      ...prev,
+      [candidateId]: {
+        candidateId,
+        candidateFilename: result.filename,
+        status,
+        reason: reason || ''
+      }
+    }))
+    
+    // Actualizar estado visual local (para mostrar que la acción está seleccionada)
+    setCandidateActions(prev => ({
+      ...prev,
+      [candidateId]: { candidateId, status, notes: reason }
+    }))
+    
+    // Cerrar modal
+    setActionModal({ isOpen: false, candidateId: null, action: null, result: null })
   }
 
-  const applyAction = async (candidateId: string, status: CandidateStatus, result: CandidateAnalysisResult, reason: string = '') => {
-    try {
-      // Enviar al backend
-      await registerCandidateAction({
-        candidate_id: candidateId,
-        candidate_filename: result.filename,
-        action: status,
-        reason: reason || undefined
-      })
-      
-      // Actualizar estado local
-      setCandidateActions(prev => ({
-        ...prev,
-        [candidateId]: { candidateId, status, notes: reason }
-      }))
-      setSelectedCandidates(prev => {
-        const next = new Set(prev)
-        next.delete(candidateId)
-        return next
-      })
-    } catch (error) {
-      console.error('Error registrando acción:', error)
-      // Aún así actualizar el estado local para feedback inmediato
-      setCandidateActions(prev => ({
-        ...prev,
-        [candidateId]: { candidateId, status, notes: reason }
-      }))
-    }
+  const applyAction = (candidateId: string, status: CandidateStatus, result: CandidateAnalysisResult, reason: string = '') => {
+    // Guardar como acción pendiente (NO enviar al backend todavía)
+    setPendingActions(prev => ({
+      ...prev,
+      [candidateId]: {
+        candidateId,
+        candidateFilename: result.filename,
+        status,
+        reason: reason || ''
+      }
+    }))
+    
+    // Actualizar estado visual local
+    setCandidateActions(prev => ({
+      ...prev,
+      [candidateId]: { candidateId, status, notes: reason }
+    }))
   }
 
-  const applyBulkAction = async (status: CandidateStatus, reason: string = '') => {
-    const updates: Record<string, CandidateAction> = {}
-    const promises: Promise<void>[] = []
+  const applyBulkAction = (status: CandidateStatus, reason: string = '') => {
+    const pendingUpdates: Record<string, PendingAction> = {}
+    const visualUpdates: Record<string, CandidateAction> = {}
     
     selectedCandidates.forEach(id => {
       // Encontrar el resultado correspondiente
       const result = results.find(r => getCandidateId(r) === id)
       if (result) {
-        promises.push(
-          registerCandidateAction({
-            candidate_id: id,
-            candidate_filename: result.filename,
-            action: status,
-            reason: reason || undefined
-          }).then(() => {
-            updates[id] = { candidateId: id, status, notes: reason }
-          }).catch(error => {
-            console.error(`Error registrando acción para ${id}:`, error)
-            // Aún así actualizar localmente
-            updates[id] = { candidateId: id, status, notes: reason }
-          })
-        )
+        // Guardar como acción pendiente
+        pendingUpdates[id] = {
+          candidateId: id,
+          candidateFilename: result.filename,
+          status,
+          reason: reason || ''
+        }
+        // Actualizar estado visual
+        visualUpdates[id] = { candidateId: id, status, notes: reason }
       }
     })
     
-    await Promise.all(promises)
-    setCandidateActions(prev => ({ ...prev, ...updates }))
+    setPendingActions(prev => ({ ...prev, ...pendingUpdates }))
+    setCandidateActions(prev => ({ ...prev, ...visualUpdates }))
     setSelectedCandidates(new Set())
     setShowBulkActions(false)
   }
@@ -255,12 +238,60 @@ export function AnalysisResult({ results }: Props) {
     }
   }
 
-  const handleBulkActionConfirm = async (reason: string) => {
+  const handleBulkActionConfirm = (reason: string) => {
     if (!actionModal.action) return
     
     const status = actionModal.action
-    await applyBulkAction(status, reason)
+    applyBulkAction(status, reason)
     setActionModal({ isOpen: false, candidateId: null, action: null, result: null })
+  }
+
+  const handleSubmitDecisions = async () => {
+    if (Object.keys(pendingActions).length === 0) return
+
+    setIsSubmitting(true)
+    const errors: string[] = []
+    const successful: string[] = []
+
+    try {
+      // Enviar todas las acciones pendientes al backend
+      const promises = Object.values(pendingActions).map(async (pendingAction) => {
+        try {
+          await registerCandidateAction({
+            candidate_id: pendingAction.candidateId,
+            candidate_filename: pendingAction.candidateFilename,
+            action: pendingAction.status,
+            reason: pendingAction.reason || undefined
+          })
+          successful.push(pendingAction.candidateId)
+        } catch (error) {
+          console.error(`Error registrando acción para ${pendingAction.candidateId}:`, error)
+          errors.push(pendingAction.candidateId)
+        }
+      })
+
+      await Promise.all(promises)
+
+      // Si hubo errores, mostrar mensaje
+      if (errors.length > 0) {
+        alert(`Se registraron ${successful.length} decisiones exitosamente, pero ${errors.length} fallaron. Por favor, intenta nuevamente.`)
+      } else {
+        // Resetear todo el estado después de enviar exitosamente
+        setPendingActions({})
+        setCandidateActions({})
+        setSelectedCandidates(new Set())
+        setShowBulkActions(false)
+        setExpandedCards({})
+        
+        // Mostrar mensaje de éxito
+        alert(`Se registraron exitosamente ${successful.length} decisión${successful.length > 1 ? 'es' : ''} en la bitácora.`)
+      }
+    } catch (error) {
+      console.error('Error enviando decisiones:', error)
+      alert('Hubo un error al enviar las decisiones. Por favor, intenta nuevamente.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const getStatusLabel = (status: CandidateStatus): string => {
@@ -312,6 +343,132 @@ export function AnalysisResult({ results }: Props) {
           </div>
         )}
       </div>
+
+      {/* Panel de acciones pendientes y botón de envío */}
+      {Object.keys(pendingActions).length > 0 && (
+        <div className="card" style={{ 
+          marginBottom: '1.5rem', 
+          padding: '1rem 1.5rem',
+          background: 'linear-gradient(135deg, rgba(0, 168, 89, 0.08), rgba(0, 59, 113, 0.05))',
+          border: '2px solid rgba(0, 168, 89, 0.3)',
+          borderRadius: '0.75rem'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <CheckCircle2 size={20} color="#00a859" />
+              <div>
+                <strong style={{ display: 'block', color: '#1e293b', marginBottom: '0.25rem' }}>
+                  Decisiones pendientes de envío
+                </strong>
+                <span style={{ fontSize: '0.875rem', color: '#64748b' }}>
+                  {Object.keys(pendingActions).length} decisión{Object.keys(pendingActions).length > 1 ? 'es' : ''} lista{Object.keys(pendingActions).length > 1 ? 's' : ''} para registrar en la bitácora
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleSubmitDecisions}
+              disabled={isSubmitting}
+              className="btn-primary"
+              style={{ 
+                fontSize: '0.875rem', 
+                padding: '0.625rem 1.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                fontWeight: 600,
+                opacity: isSubmitting ? 0.6 : 1,
+                cursor: isSubmitting ? 'not-allowed' : 'pointer'
+              }}
+            >
+              {isSubmitting ? (
+                <>
+                  <Clock size={16} />
+                  Enviando...
+                </>
+              ) : (
+                <>
+                  <CheckCircle size={16} />
+                  Enviar decisión{Object.keys(pendingActions).length > 1 ? 'es' : ''}
+                </>
+              )}
+            </button>
+          </div>
+          <div style={{ 
+            display: 'flex', 
+            flexWrap: 'wrap', 
+            gap: '0.5rem',
+            paddingTop: '0.75rem',
+            borderTop: '1px solid rgba(0, 168, 89, 0.2)'
+          }}>
+            {Object.values(pendingActions).map((action) => {
+              const result = results.find(r => getCandidateId(r) === action.candidateId)
+              return (
+                <span
+                  key={action.candidateId}
+                  style={{
+                    fontSize: '0.75rem',
+                    padding: '0.375rem 0.75rem',
+                    borderRadius: '0.5rem',
+                    background: action.status === 'interview' 
+                      ? 'rgba(0, 168, 89, 0.1)' 
+                      : action.status === 'rejected'
+                      ? 'rgba(239, 68, 68, 0.1)'
+                      : 'rgba(148, 163, 184, 0.1)',
+                    color: action.status === 'interview'
+                      ? '#00a859'
+                      : action.status === 'rejected'
+                      ? '#dc2626'
+                      : '#64748b',
+                    border: `1px solid ${
+                      action.status === 'interview' 
+                        ? 'rgba(0, 168, 89, 0.3)' 
+                        : action.status === 'rejected'
+                        ? 'rgba(239, 68, 68, 0.3)'
+                        : 'rgba(148, 163, 184, 0.3)'
+                    }`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  {getStatusIcon(action.status)}
+                  <span>{result?.candidateId || result?.filename || action.candidateId}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Remover de acciones pendientes
+                      setPendingActions(prev => {
+                        const next = { ...prev }
+                        delete next[action.candidateId]
+                        return next
+                      })
+                      // Remover del estado visual
+                      setCandidateActions(prev => {
+                        const next = { ...prev }
+                        delete next[action.candidateId]
+                        return next
+                      })
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '0.125rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      marginLeft: '0.25rem'
+                    }}
+                    title="Cancelar decisión"
+                  >
+                    <X size={14} />
+                  </button>
+                </span>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Panel de acciones en lote */}
       {showBulkActions && selectedCandidates.size > 0 && (
@@ -416,14 +573,14 @@ export function AnalysisResult({ results }: Props) {
             })))
           } else {
             // Fallback: usar missing_information como riesgos
-            if (result.ethical_compliance === false) {
+          if (result.ethical_compliance === false) {
               riskItems.push({
                 category: 'Cumplimiento',
                 level: 'alto',
                 description: 'Requiere revisión ética antes de avanzar.'
               })
-            }
-            if (result.missing_information && result.missing_information.length > 0) {
+          }
+          if (result.missing_information && result.missing_information.length > 0) {
               result.missing_information.forEach((info: string) => {
                 riskItems.push({
                   category: 'Cumplimiento',
@@ -431,8 +588,8 @@ export function AnalysisResult({ results }: Props) {
                   description: info
                 })
               })
-            }
-            if (riskItems.length === 0) {
+          }
+          if (riskItems.length === 0) {
               riskItems.push({
                 category: 'General',
                 level: 'bajo',
@@ -471,14 +628,14 @@ export function AnalysisResult({ results }: Props) {
                     }}
                     style={{ width: '18px', height: '18px', cursor: 'pointer' }}
                   />
-                  <div className="candidate-result__identity">
-                    <div className={`candidate-result__score candidate-result__score--${tone}`}>
-                      <span>{score}</span>
-                      <small>/100</small>
-                    </div>
-                    <div>
-                      <h3>{result.candidateId || result.filename}</h3>
-                      <p>{result.filename}</p>
+                <div className="candidate-result__identity">
+                  <div className={`candidate-result__score candidate-result__score--${tone}`}>
+                    <span>{score}</span>
+                    <small>/100</small>
+                  </div>
+                  <div>
+                    <h3>{result.candidateId || result.filename}</h3>
+                    <p>{result.filename}</p>
                     </div>
                   </div>
                 </div>
@@ -515,15 +672,53 @@ export function AnalysisResult({ results }: Props) {
                       {getStatusLabel(action.status)}
                     </span>
                   )}
-                  <button
-                    type="button"
-                    className="candidate-result__toggle"
-                    onClick={() => toggleCard(cardId)}
-                  >
-                    {isExpanded ? 'Ocultar detalles' : 'Ver detalles'}
-                  </button>
+                <button
+                  type="button"
+                  className="candidate-result__toggle"
+                  onClick={() => toggleCard(cardId)}
+                >
+                  {isExpanded ? 'Ocultar detalles' : 'Ver detalles'}
+                </button>
                 </div>
               </header>
+
+              {/* Resumen ejecutivo */}
+              <div style={{
+                padding: '1rem',
+                background: 'rgba(59, 130, 246, 0.05)',
+                border: '1px solid rgba(59, 130, 246, 0.15)',
+                borderRadius: '0.5rem',
+                marginBottom: '1rem'
+              }}>
+                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 500 }}>Match:</span>
+                    <span style={{ 
+                      fontSize: '0.875rem', 
+                      fontWeight: 600,
+                      color: score >= 75 ? '#00a859' : score >= 60 ? '#d97706' : '#dc2626'
+                    }}>
+                      {score >= 75 ? 'Alto' : score >= 60 ? 'Medio' : 'Bajo'} ({score}%)
+                    </span>
+                  </div>
+                  {strengths.length > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <CheckCircle2 size={16} color="#00a859" />
+                      <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                        {strengths.length} insight{strengths.length > 1 ? 's' : ''} destacado{strengths.length > 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  )}
+                  {riskItems.filter(r => r.level === 'alto').length > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <AlertTriangle size={16} color="#dc2626" />
+                      <span style={{ fontSize: '0.75rem', color: '#dc2626', fontWeight: 500 }}>
+                        {riskItems.filter(r => r.level === 'alto').length} riesgo{riskItems.filter(r => r.level === 'alto').length > 1 ? 's' : ''} alto{riskItems.filter(r => r.level === 'alto').length > 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
 
               <p className="candidate-result__summary">{isExpanded ? result.recommendation : summary}</p>
 
@@ -619,22 +814,163 @@ export function AnalysisResult({ results }: Props) {
 
               <div className="candidate-result__highlights">
                 <div>
-                  <h4>Fortalezas detectadas</h4>
-                  <ul>
-                    {strengths.length > 0 ? (
-                      strengths.map((criterion, index) => (
-                        <li key={`${cardId}-strength-${index}`}>{criterion.name}: {criterion.value}</li>
-                      ))
-                    ) : (
-                      <li>No se identificaron fortalezas destacadas.</li>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                    <h4 style={{ margin: 0 }}>Insights</h4>
+                    {strengths.length > 0 && (
+                      <span style={{
+                        fontSize: '0.75rem',
+                        color: '#64748b',
+                        background: 'rgba(0, 168, 89, 0.1)',
+                        padding: '0.25rem 0.5rem',
+                        borderRadius: '0.25rem',
+                        fontWeight: 500
+                      }}>
+                        {strengths.length} {strengths.length === 1 ? 'insight' : 'insights'}
+                      </span>
                     )}
-                  </ul>
+                  </div>
+                  {strengths.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      {strengths.map((criterion, index) => {
+                        // Detectar tipo de coincidencia en el valor
+                        const valueLower = criterion.value.toLowerCase()
+                        const matchType = valueLower.includes('coincidencia: exacta') ? 'EXACTA' :
+                                         valueLower.includes('coincidencia: parcial') ? 'PARCIAL' :
+                                         valueLower.includes('coincidencia: ninguna') ? 'NINGUNA' : null
+                        
+                        return (
+                          <div 
+                            key={`${cardId}-strength-${index}`}
+                            style={{
+                              padding: '0.875rem',
+                              background: 'rgba(0, 168, 89, 0.05)',
+                              border: '1px solid rgba(0, 168, 89, 0.15)',
+                              borderRadius: '0.5rem',
+                              borderLeft: '3px solid #00a859',
+                              position: 'relative'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                              <strong style={{ 
+                                display: 'block',
+                                fontSize: '0.875rem',
+                                color: '#00a859',
+                                fontWeight: 600,
+                                flex: 1
+                              }}>
+                                {criterion.name}
+                              </strong>
+                              {matchType && (
+                                <span style={{
+                                  fontSize: '0.7rem',
+                                  fontWeight: 600,
+                                  padding: '0.2rem 0.4rem',
+                                  borderRadius: '0.25rem',
+                                  background: matchType === 'EXACTA' ? 'rgba(0, 168, 89, 0.15)' :
+                                            matchType === 'PARCIAL' ? 'rgba(245, 158, 11, 0.15)' :
+                                            'rgba(239, 68, 68, 0.15)',
+                                  color: matchType === 'EXACTA' ? '#00a859' :
+                                        matchType === 'PARCIAL' ? '#d97706' :
+                                        '#dc2626',
+                                  textTransform: 'uppercase'
+                                }}>
+                                  {matchType}
+                                </span>
+                              )}
+                              {criterion.weight !== undefined && criterion.weight !== null && (
+                                <span style={{
+                                  fontSize: '0.7rem',
+                                  color: '#64748b',
+                                  fontWeight: 500
+                                }}>
+                                  {Math.round(criterion.weight * 100)}%
+                                </span>
+                              )}
+                            </div>
+                            <p style={{
+                              margin: 0,
+                              fontSize: '0.875rem',
+                              color: '#1e293b',
+                              lineHeight: '1.6',
+                              whiteSpace: 'pre-wrap'
+                            }}>
+                              {criterion.value}
+                            </p>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <p style={{ color: '#64748b', fontSize: '0.875rem', fontStyle: 'italic', margin: 0 }}>
+                      No se identificaron insights destacados.
+                    </p>
+                  )}
                 </div>
                 <div>
-                  <h4>Riesgos y alertas</h4>
-                  <ul>
-                    {riskItems.length > 0 ? (
-                      riskItems.map((item, index) => {
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                    <h4 style={{ margin: 0 }}>Riesgos y alertas</h4>
+                    {riskItems.length > 0 && (
+                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        {riskItems.filter(r => r.level === 'alto').length > 0 && (
+                          <span style={{
+                            fontSize: '0.7rem',
+                            color: '#dc2626',
+                            background: 'rgba(239, 68, 68, 0.1)',
+                            padding: '0.2rem 0.4rem',
+                            borderRadius: '0.25rem',
+                            fontWeight: 600
+                          }}>
+                            {riskItems.filter(r => r.level === 'alto').length} alto{riskItems.filter(r => r.level === 'alto').length > 1 ? 's' : ''}
+                          </span>
+                        )}
+                        {riskItems.filter(r => r.level === 'medio').length > 0 && (
+                          <span style={{
+                            fontSize: '0.7rem',
+                            color: '#d97706',
+                            background: 'rgba(245, 158, 11, 0.1)',
+                            padding: '0.2rem 0.4rem',
+                            borderRadius: '0.25rem',
+                            fontWeight: 600
+                          }}>
+                            {riskItems.filter(r => r.level === 'medio').length} medio{riskItems.filter(r => r.level === 'medio').length > 1 ? 's' : ''}
+                          </span>
+                        )}
+                        {riskItems.filter(r => r.level === 'bajo').length > 0 && (
+                          <span style={{
+                            fontSize: '0.7rem',
+                            color: '#64748b',
+                            background: 'rgba(148, 163, 184, 0.1)',
+                            padding: '0.2rem 0.4rem',
+                            borderRadius: '0.25rem',
+                            fontWeight: 600
+                          }}>
+                            {riskItems.filter(r => r.level === 'bajo').length} bajo{riskItems.filter(r => r.level === 'bajo').length > 1 ? 's' : ''}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  {riskItems.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      {riskItems.map((item, index) => {
+                        // Normalizar la descripción del riesgo para que indique claramente lo que falta
+                        let normalizedDescription = item.description
+                        const lowerDesc = normalizedDescription.toLowerCase()
+                        
+                        // Si la descripción no indica claramente que algo falta, agregarlo
+                        if (!lowerDesc.startsWith('no se menciona') && 
+                            !lowerDesc.startsWith('faltan') && 
+                            !lowerDesc.startsWith('falta') &&
+                            !lowerDesc.startsWith('ausencia') &&
+                            !lowerDesc.startsWith('no se encontró') &&
+                            !lowerDesc.startsWith('no se encontraron') &&
+                            !lowerDesc.includes('no coincide') &&
+                            !lowerDesc.includes('no está') &&
+                            !lowerDesc.includes('no cumple')) {
+                          // Si parece ser un requisito específico, agregar "No se menciona"
+                          normalizedDescription = `No se menciona ${normalizedDescription.toLowerCase()}`
+                        }
+                        
                         const levelColors: Record<string, {bg: string, text: string, border: string}> = {
                           'alto': { bg: 'rgba(239, 68, 68, 0.1)', text: '#dc2626', border: 'rgba(239, 68, 68, 0.3)' },
                           'medio': { bg: 'rgba(245, 158, 11, 0.1)', text: '#d97706', border: 'rgba(245, 158, 11, 0.3)' },
@@ -642,11 +978,10 @@ export function AnalysisResult({ results }: Props) {
                         }
                         const colors = levelColors[item.level] || levelColors['medio']
                         return (
-                          <li 
+                          <div 
                             key={`${cardId}-risk-${index}`}
                             style={{
                               padding: '0.75rem',
-                              marginBottom: '0.5rem',
                               background: colors.bg,
                               border: `1px solid ${colors.border}`,
                               borderRadius: '0.5rem',
@@ -657,7 +992,8 @@ export function AnalysisResult({ results }: Props) {
                               display: 'flex', 
                               alignItems: 'flex-start', 
                               gap: '0.5rem',
-                              flexWrap: 'wrap'
+                              flexWrap: 'wrap',
+                              marginBottom: '0.5rem'
                             }}>
                               <span style={{
                                 fontSize: '0.75rem',
@@ -680,28 +1016,43 @@ export function AnalysisResult({ results }: Props) {
                               </span>
                             </div>
                             <p style={{
-                              marginTop: '0.5rem',
-                              marginBottom: 0,
+                              margin: 0,
                               fontSize: '0.875rem',
                               color: '#1e293b',
                               lineHeight: '1.5'
                             }}>
-                              {item.description}
+                              {normalizedDescription}
                             </p>
-                          </li>
+                          </div>
                         )
-                      })
-                    ) : (
-                      <li>Sin alertas relevantes detectadas.</li>
-                    )}
-                  </ul>
+                      })}
+                    </div>
+                  ) : (
+                    <p style={{ color: '#64748b', fontSize: '0.875rem', fontStyle: 'italic' }}>
+                      Sin alertas relevantes detectadas.
+                    </p>
+                  )}
                 </div>
               </div>
 
               {isExpanded && (
                 <div className="candidate-result__details">
                   <div className="candidate-result__panel">
-                    <h4>Criterios objetivos evaluados</h4>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                      <h4 style={{ margin: 0 }}>Criterios objetivos evaluados</h4>
+                      {result.objective_criteria.length > 0 && (
+                        <span style={{
+                          fontSize: '0.75rem',
+                          color: '#64748b',
+                          background: 'rgba(59, 130, 246, 0.1)',
+                          padding: '0.25rem 0.5rem',
+                          borderRadius: '0.25rem',
+                          fontWeight: 500
+                        }}>
+                          {result.objective_criteria.length} {result.objective_criteria.length === 1 ? 'criterio' : 'criterios'}
+                        </span>
+                      )}
+                    </div>
                     {result.objective_criteria.length === 0 && <p>No se proporcionaron criterios objetivos.</p>}
                     {result.objective_criteria.map((criterion, index) => {
                       const contribution =
@@ -709,20 +1060,20 @@ export function AnalysisResult({ results }: Props) {
                           ? Math.round((Math.max(0, criterion.weight) / totalWeight) * 100)
                           : null
                       return (
-                        <div key={`${cardId}-criterion-${index}`} className="criterion-bar">
+                        <div key={`${cardId}-criterion-${index}`} className="criterion-bar" style={{ marginBottom: '1rem' }}>
                           <div className="criterion-bar__label">
                             <strong>{criterion.name}</strong>
                             {criterion.weight !== undefined && criterion.weight !== null && (
                               <span>{Math.round(Math.max(0, criterion.weight) * 100)}%</span>
                             )}
                           </div>
-                          <p>{criterion.value}</p>
-                      {contribution !== null && (
+                          <p style={{ marginTop: '0.5rem', marginBottom: '0.5rem' }}>{criterion.value}</p>
+                          {contribution !== null && (
                         <div className="criterion-bar__track">
-                          <div style={{ width: `${Math.min(100, contribution)}%` }} />
+                              <div style={{ width: `${Math.min(100, contribution)}%` }} />
                           <span>{contribution}%</span>
-                        </div>
-                      )}
+                            </div>
+                          )}
                         </div>
                       )
                     })}
