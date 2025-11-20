@@ -61,13 +61,19 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
 # Copiar node_modules (Next.js necesita todas las dependencias en runtime)
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 
+# Copiar script de inicio y hacerlo ejecutable (antes de cambiar de usuario)
+COPY --from=builder --chown=nextjs:nodejs /app/start.sh ./start.sh
+RUN chmod +x ./start.sh
+
 # Cambiar a usuario no-root para ejecutar la aplicación
 USER nextjs
 
 EXPOSE 3000
 
-ENV PORT=3000
+# Render proporciona $PORT automáticamente
 ENV HOSTNAME="0.0.0.0"
+ENV NODE_ENV=production
 
 # Render usa $PORT → esto es obligatorio
-CMD ["sh", "-c", "npm run start -- -p $PORT"]
+# Usar el script de inicio que maneja mejor los errores
+CMD ["./start.sh"]
