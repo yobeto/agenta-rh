@@ -11,12 +11,14 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
-  const [mounted, setMounted] = useState(false)
+  const [mounted, setMounted] = useState(true) // Iniciar como true para que sea visible inmediatamente
   const [isMobile, setIsMobile] = useState(false)
-  const { login } = useAuth()
+  
+  // Obtener login del contexto (siempre se llama)
+  const auth = useAuth()
+  const loginFn = auth.login
 
   useEffect(() => {
-    setMounted(true)
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 640)
     }
@@ -31,7 +33,7 @@ export default function LoginPage() {
     setIsLoading(true)
 
     try {
-      await login(username, password)
+      await loginFn(username, password)
       // La redirección se maneja en el contexto
     } catch (err: any) {
       setError(err.message || 'Error al iniciar sesión')
@@ -77,10 +79,11 @@ export default function LoginPage() {
           maxWidth: '420px',
           position: 'relative',
           zIndex: 1,
-          opacity: mounted ? 1 : 0,
-          transform: mounted ? 'translateY(0)' : 'translateY(20px)',
+          opacity: 1, // Siempre visible
+          transform: 'translateY(0)', // Sin animación inicial
           transition: 'opacity 0.4s ease, transform 0.4s ease',
-          margin: '0 auto'
+          margin: '0 auto',
+          visibility: 'visible' // Siempre visible
         }}
       >
         <div 
