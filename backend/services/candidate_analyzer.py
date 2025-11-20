@@ -106,6 +106,70 @@ class CandidateAnalyzer:
 
         return analyses
 
+    def _estimate_tokens(self, text: str) -> int:
+        """
+        Estima el número de tokens en un texto.
+        Aproximación: 1 token ≈ 4 caracteres (conservador para español)
+        """
+        return len(text) // 4
+    
+    def _truncate_text_intelligently(self, text: str, max_tokens: int) -> str:
+        """
+        Trunca texto de manera inteligente, manteniendo el inicio y final.
+        El inicio suele tener información clave (título, resumen, requisitos principales).
+        El final puede tener información adicional importante.
+        """
+        max_chars = max_tokens * 4  # Convertir tokens a caracteres
+        
+        if len(text) <= max_chars:
+            return text
+        
+        # Calcular cuánto espacio tenemos
+        # Dividir: 60% inicio, 40% final
+        start_chars = int(max_chars * 0.6)
+        end_chars = int(max_chars * 0.4)
+        
+        # Obtener las partes
+        start_part = text[:start_chars]
+        end_part = text[-end_chars:]
+        
+        # Buscar el último punto/punto y coma/salto de línea antes del corte para no cortar palabras
+        start_cut_pos = start_part.rfind('.')
+        if start_cut_pos == -1:
+            start_cut_pos = start_part.rfind(';')
+        if start_cut_pos == -1:
+            start_cut_pos = start_part.rfind('\n')
+        if start_cut_pos == -1:
+            start_cut_pos = len(start_part)
+        else:
+            start_cut_pos += 1  # Incluir el carácter de corte
+        
+        # Buscar el primer punto/punto y coma/salto de línea después del inicio del final
+        end_cut_pos = end_part.find('.')
+        if end_cut_pos == -1:
+            end_cut_pos = end_part.find(';')
+        if end_cut_pos == -1:
+            end_cut_pos = end_part.find('\n')
+        if end_cut_pos == -1:
+            end_cut_pos = 0
+        else:
+            end_cut_pos += 1  # Incluir el carácter de corte
+        
+        # Ajustar las partes
+        start_part = text[:start_cut_pos]
+        
+        # Para el final, tomar desde el final menos los caracteres disponibles
+        # Si encontramos un punto de corte, empezar desde ahí
+        if end_cut_pos > 0:
+            # Empezar desde el punto de corte encontrado
+            end_start_idx = len(text) - end_chars + end_cut_pos
+            end_part = text[end_start_idx:]
+        else:
+            # No encontramos punto de corte, tomar los últimos caracteres
+            end_part = text[-end_chars:]
+        
+        return f"{start_part}\n\n[... contenido truncado para cumplir límite de tokens ...]\n\n{end_part}"
+    
     def _build_ethical_prompt(
         self,
         job_description: str,
@@ -114,9 +178,14 @@ class CandidateAnalyzer:
     ) -> str:
         """
         Construye un prompt que aplica estrictamente los principios éticos
-        y realiza comparación directa y estricta entre JD y CV
+        y realiza comparación directa y estricta entre JD y CV.
+        Trunca el contenido si es necesario para cumplir con el límite de tokens.
         """
-        return f"""Eres un asistente de Recursos Humanos para agente-rh. Tu función es COMPARAR DIRECTAMENTE el CV del candidato con los REQUISITOS ESPECÍFICOS del Job Description.
+        # Límite de tokens del modelo (8192) menos espacio para respuesta (~2000) = ~6000 tokens para el prompt
+        MAX_PROMPT_TOKENS = 6000
+        
+        # Construir el prompt base (sin JD y CV)
+        prompt_base = f"""Eres un asistente de Recursos Humanos para agente-rh. Tu función es COMPARAR DIRECTAMENTE el CV del candidato con los REQUISITOS ESPECÍFICOS del Job Description.
 
 MÉTODO DE ANÁLISIS (OBLIGATORIO - SEGUIR EN ORDEN):
 
@@ -264,11 +333,11 @@ Resultado: Mismas habilidades técnicas, industria diferente pero transferible �
 
 JOB DESCRIPTION (referencia principal - REQUISITOS A CUMPLIR):
 
-{job_description}
+{{job_description}}
 
 CV ANALIZADO ({filename} - COMPARAR CON REQUISITOS ARRIBA):
 
-{cv_content}
+{{cv_content}}
 
 INSTRUCCIONES FINALES (SEGUIR EN ORDEN):
 
@@ -393,6 +462,51 @@ IMPORTANTE:
 - NO asumas que "experiencia general" es suficiente si el JD requiere algo específico
 - NO des puntajes altos sin coincidencias reales y específicas
 - Recuerda: esto es APOYO, no una decisión final"""
+        
+        # Calcular tokens del prompt base (sin JD y CV)
+        base_tokens = self._estimate_tokens(prompt_base.format(job_description="", cv_content=""))
+        
+        # Calcular espacio disponible para JD y CV
+        available_tokens = MAX_PROMPT_TOKENS - base_tokens
+        
+        # Si no hay suficiente espacio, reducir aún más
+        if available_tokens < 1000:
+            available_tokens = 1000  # Mínimo para JD y CV
+        
+        # Dividir el espacio disponible: 50% JD, 50% CV
+        jd_max_tokens = available_tokens // 2
+        cv_max_tokens = available_tokens // 2
+        
+        # Truncar JD y CV si es necesario
+        jd_tokens = self._estimate_tokens(job_description)
+        cv_tokens = self._estimate_tokens(cv_content)
+        
+        if jd_tokens > jd_max_tokens:
+            logger.warning(
+                f"Job Description excede límite de tokens ({jd_tokens} > {jd_max_tokens}). "
+                f"Truncando para candidato {filename}"
+            )
+            job_description = self._truncate_text_intelligently(job_description, jd_max_tokens)
+        
+        if cv_tokens > cv_max_tokens:
+            logger.warning(
+                f"CV excede límite de tokens ({cv_tokens} > {cv_max_tokens}). "
+                f"Truncando para candidato {filename}"
+            )
+            cv_content = self._truncate_text_intelligently(cv_content, cv_max_tokens)
+        
+        # Construir el prompt final
+        final_prompt = prompt_base.format(job_description=job_description, cv_content=cv_content)
+        
+        # Verificar que el prompt final esté dentro del límite
+        final_tokens = self._estimate_tokens(final_prompt)
+        if final_tokens > MAX_PROMPT_TOKENS:
+            logger.warning(
+                f"Prompt final aún excede límite ({final_tokens} > {MAX_PROMPT_TOKENS}). "
+                f"Puede haber errores. Candidato: {filename}"
+            )
+        
+        return final_prompt
     
     async def _call_ai(self, prompt: str, model_id: Optional[str] = None) -> str:
         """
